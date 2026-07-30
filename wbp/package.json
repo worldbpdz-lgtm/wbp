@@ -5,7 +5,10 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "dev:ip": "next dev -H 127.0.0.1",
+    "dev:alt": "next dev -H 127.0.0.1 -p 3005",
+    "diagnose": "node scripts/diagnose.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.0",
