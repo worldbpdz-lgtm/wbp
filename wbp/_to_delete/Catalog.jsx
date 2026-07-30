@@ -72,37 +72,12 @@ export default function Catalog() {
     </div>
   );
 
-  // Rangée de marques : on suit le défilement pour afficher les flèches et les
-  // fondus uniquement quand il reste des marques à découvrir.
-  const brandRowRef = React.useRef(null);
-  const [bScroll, setBScroll] = React.useState({ l: false, r: false });
-  const syncBrandScroll = React.useCallback(() => {
-    const el = brandRowRef.current; if (!el) return;
-    const max = el.scrollWidth - el.clientWidth;
-    const x = Math.abs(el.scrollLeft);           // scrollLeft est négatif en RTL
-    setBScroll({ l: x > 4, r: x < max - 4 });
-  }, []);
-  React.useEffect(() => {
-    syncBrandScroll();
-    window.addEventListener('resize', syncBrandScroll);
-    return () => window.removeEventListener('resize', syncBrandScroll);
-  }, [syncBrandScroll, wbp.brands.length]);
-  const scrollBrands = (dir) => {
-    const el = brandRowRef.current; if (!el) return;
-    const rtl = getComputedStyle(el).direction === 'rtl';
-    el.scrollBy({ left: dir * (rtl ? -1 : 1) * Math.max(220, el.clientWidth * 0.7), behavior: 'smooth' });
-  };
-
-  // Filtre par marque — UNE seule rangée horizontale au-dessus de la barre de
-  // recherche : logo réel + nom complet, avec défilement fléché si ça dépasse.
+  // Filtre par marque — bandeau horizontal AU-DESSUS de la barre de recherche.
+  // Chaque puce affiche le vrai logo de la marque + son nom complet.
   const BrandBar = wbp.brands.length > 0 && (
-    <div className={`brand-bar ${bScroll.l ? 'can-l' : ''} ${bScroll.r ? 'can-r' : ''}`} role="group" aria-label={t('nav_brands')}>
+    <div className="brand-bar" role="group" aria-label={t('nav_brands')}>
       <span className="brand-bar-label">{t('nav_brands')}</span>
-      <div className="brand-bar-scroll">
-        <button type="button" className="brand-bar-nav prev" onClick={() => scrollBrands(-1)} aria-label="prev" tabIndex={-1}>
-          <Icon name="chevleft" size={16} />
-        </button>
-        <div className="brand-bar-chips" ref={brandRowRef} onScroll={syncBrandScroll}>
+      <div className="brand-bar-chips">
         <button className={`brand-chip brand-chip-all ${brand === 'all' ? 'on' : ''}`} onClick={() => setBrand('all')} aria-pressed={brand === 'all'}>
           <span className="brand-chip-plate brand-chip-mark"><Icon name="layers" size={15} /></span>
           <span className="brand-chip-name">{t('all_brands')}</span>
@@ -122,10 +97,6 @@ export default function Catalog() {
             </button>
           );
         })}
-        </div>
-        <button type="button" className="brand-bar-nav next" onClick={() => scrollBrands(1)} aria-label="next" tabIndex={-1}>
-          <Icon name="chevright" size={16} />
-        </button>
       </div>
     </div>
   );

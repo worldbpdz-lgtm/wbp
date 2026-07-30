@@ -181,7 +181,6 @@ html, body { overflow-x: visible; }
   /* Brand chips row above the search bar — compact logos, swipeable */
   .brand-bar { gap: 8px; margin: 0 0 10px; }
   .brand-bar-label { display: none; }                /* the logos carry the meaning on phones */
-  .brand-bar-nav { display: none; }                  /* swipe instead of arrows */
   .brand-bar .brand-chip { gap: 7px; padding-inline: 5px 11px; }
   .brand-chip-plate { height: 26px; min-width: 26px; padding: 2px 6px; }
   .brand-chip-plate img { max-height: 17px; max-width: 56px; }
