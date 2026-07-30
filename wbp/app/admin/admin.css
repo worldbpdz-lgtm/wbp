@@ -111,6 +111,9 @@ select.adm-tag{border:none;cursor:pointer;-webkit-appearance:none;appearance:non
 .adm-btn.danger{color:#c0392b;border-color:#f1c9c0}
 .adm-btn.danger:hover{background:#fdeae6}
 .adm-btn.sm{padding:6px 11px;font-size:12px;border-radius:9px}
+.adm-star{min-width:32px;justify-content:center;font-size:14px;line-height:1;color:var(--ink-2)}
+.adm-star.on{color:#a86a0b;border-color:#ecd9ae;background:#fdf0d8}
+.adm-star.on:hover{background:#fbe7c2}
 .adm-actions{display:flex;gap:7px;flex-wrap:wrap;align-items:center}
 
 /* forms */

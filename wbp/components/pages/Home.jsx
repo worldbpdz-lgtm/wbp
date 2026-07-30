@@ -69,7 +69,14 @@ function CategoriesGrid() {
             const count = wbp.products.filter((p) => p.cat === c.id).length;
             return (
               <Reveal key={c.id} delay={(i % 4) * 60}>
-                <button className="cat-card" onClick={() => nav('catalog', { cat: c.id })}>
+                <button className={`cat-card ${c.image_url ? 'has-img' : ''}`} onClick={() => nav('catalog', { cat: c.id })}>
+                  {/* Image uploadée dans /admin/categories ; sinon l'icône seule. */}
+                  {c.image_url && (
+                    <span className="cat-photo" aria-hidden="true">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={c.image_url} alt="" loading="lazy" />
+                    </span>
+                  )}
                   <span className="cat-ico"><Icon name={c.icon} size={26} /></span>
                   <span className="cat-name">{c[lang]}</span>
                   <span className="cat-blurb">{c.blurb[lang] || c.blurb.fr}</span>
@@ -87,8 +94,9 @@ function CategoriesGrid() {
 
 function BestSellers() {
   const { t, nav, wbp } = useApp();
-  const flagged = wbp.products.filter((p) => p.badge === 'bestseller');
-  const items = (flagged.length ? flagged : wbp.products).slice(0, 8);
+  // Vitrine choisie dans /admin/showcase, dans l'ordre exact défini par l'admin.
+  // Si elle est vide, on retombe sur les best-sellers puis sur le catalogue.
+  const items = wbp.showcase(8);
   const trackRef = useRef(null);
   const scroll = (dir) => { const el = trackRef.current; if (!el) return; el.scrollBy({ left: dir * (el.clientWidth * 0.8), behavior: 'smooth' }); };
   return (

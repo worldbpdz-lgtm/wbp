@@ -1,10 +1,13 @@
 import { redirect } from 'next/navigation';
 import '../admin.css';
+// Chargée APRÈS admin.css : sélecteur d'images, cartes d'édition, vitrine, IA.
+import '../../../styles/admin-2026.css';
 import { hasSupabase, createAdminClient } from '@/lib/supabase/server';
 import { getSessionUser } from '@/lib/auth';
 import { isAdminEmail } from '@/lib/admin';
 import AdminNav from '@/components/AdminNav';
 import { signOutAction } from '@/app/admin/actions';
+import { SITE } from '@/lib/site';
 
 export const dynamic = 'force-dynamic';
 
@@ -30,9 +33,9 @@ export default async function PanelLayout({ children }) {
   }
   const sb = createAdminClient();
   const [q, m, r] = await Promise.all([
-    sb.from('quote_requests').select('id', { count: 'exact', head: true }).eq('status', 'new'),
-    sb.from('contact_messages').select('id', { count: 'exact', head: true }).eq('status', 'new'),
-    sb.from('reviews').select('id', { count: 'exact', head: true }).eq('approved', false),
+    sb.from('quote_requests').select('id', { count: 'exact', head: true }).eq('site', SITE).eq('status', 'new'),
+    sb.from('contact_messages').select('id', { count: 'exact', head: true }).eq('site', SITE).eq('status', 'new'),
+    sb.from('reviews').select('id', { count: 'exact', head: true }).eq('site', SITE).eq('approved', false),
   ]);
   const counts = { quotes: q.count || 0, messages: m.count || 0, reviews: r.count || 0 };
   return (

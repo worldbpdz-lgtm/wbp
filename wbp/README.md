@@ -1,5 +1,26 @@
 # World Business Plus — site web complet (Next.js + Supabase)
 
+## 🔗 Base de données PARTAGÉE avec Central Network
+
+Les deux sites (WBP sur le port 3000, Central Network sur le port 3001) utilisent
+**la même base Supabase** :
+
+- **Catalogue partagé** : produits, marques et catégories sont communs.
+  Ajouter, modifier, masquer ou supprimer un produit depuis **l'admin de
+  n'importe lequel des deux sites** met à jour **les deux sites web** instantanément.
+- **Séparé par site** : devis, messages, avis, abonnés newsletter, campagnes
+  e-mail, statistiques et paramètres (téléphone / WhatsApp / adresse / textes).
+  Chaque admin ne voit que les demandes de SON site, et chaque site garde ses
+  propres coordonnées.
+- **Mise en place (une seule fois)** : double-cliquez sur **`apply-multisite.bat`**
+  (ici ou dans le dossier Central Network — même résultat). Il applique la
+  migration `supabase/multisite.sql` et synchronise les photos produits.
+- Le même compte administrateur fonctionne sur les deux `/admin`.
+- ⚠️ Après cette migration, ne relancez plus l'ancien `setup.sql` ; utilisez
+  `apply-multisite.bat` (sans danger, ré-exécutable).
+
+---
+
 Boutique-catalogue B2B trilingue (FR / EN / AR) avec back‑office d'administration.
 Modèle **« prix sur devis »** : les visiteurs parcourent le catalogue, demandent des
 devis, laissent des avis et s'abonnent à la newsletter ; vous gérez tout depuis `/admin`.

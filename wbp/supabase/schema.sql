@@ -39,11 +39,13 @@ create table if not exists products (
   price         numeric,
   images        jsonb not null default '[]'::jsonb,
   active        boolean not null default true,
+  featured      boolean not null default false,      -- mis en avant : affiché en premier dans le catalogue
   sort          int  not null default 0,
   created_at    timestamptz not null default now()
 );
 create index if not exists products_cat_idx   on products(cat);
 create index if not exists products_brand_idx on products(brand);
+create index if not exists products_featured_idx on products(featured) where featured;
 
 create table if not exists clients (
   id   serial primary key,

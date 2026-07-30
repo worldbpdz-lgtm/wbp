@@ -8,21 +8,49 @@ import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import CartDrawer from '@/components/CartDrawer';
 import BottomNav from '@/components/BottomNav';
+import NewsletterPopup from '@/components/NewsletterPopup';
+import AiChat from '@/components/AiChat';
 
 function lsGet(k, fb) { try { const v = localStorage.getItem(k); return v == null ? fb : JSON.parse(v); } catch { return fb; } }
 function lsSet(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* ignore */ } }
 
 function buildWbp(catalog) {
   const { brands, categories, products, clients } = catalog;
+  // Vitrine (/admin/showcase) : ordre choisi par l'admin. rank 0 = tout devant.
+  const picks = Array.isArray(catalog.picks) ? catalog.picks : [];
+  const rank = new Map(picks.map((id, i) => [id, i]));
   return {
     brands, categories, products, clients, WHATSAPP,
+    picks,
+    /** Rang dans la vitrine (Infinity si le produit n'y est pas). */
+    pickRank: (id) => (rank.has(id) ? rank.get(id) : Infinity),
+    /**
+     * Comparateur prêt à l'emploi : vitrine d'abord, dans l'ordre défini.
+     * Deux produits hors vitrine sont à égalité (0) — surtout ne pas renvoyer
+     * Infinity - Infinity, qui vaut NaN et casserait Array.sort().
+     */
+    byPick: (a, b) => {
+      const ra = rank.has(a.id) ? rank.get(a.id) : -1;
+      const rb = rank.has(b.id) ? rank.get(b.id) : -1;
+      if (ra === rb) return 0;          // tous deux hors vitrine, ou même rang
+      if (ra === -1) return 1;          // a hors vitrine → après b
+      if (rb === -1) return -1;         // b hors vitrine → après a
+      return ra - rb;
+    },
+    /** Les produits de la vitrine, dans l'ordre, puis un repli si elle est vide. */
+    showcase: (limit = 8) => {
+      const chosen = picks.map((id) => products.find((p) => p.id === id)).filter(Boolean);
+      if (chosen.length) return chosen.slice(0, limit);
+      const best = products.filter((p) => p.badge === 'bestseller');
+      return (best.length ? best : products).slice(0, limit);
+    },
     brandById: (id) => brands.find((b) => b.id === id),
     categoryById: (id) => categories.find((c) => c.id === id),
     productById: (id) => products.find((p) => p.id === id),
   };
 }
 
-export default function AppProvider({ catalog, settings = {}, children }) {
+export default function AppProvider({ catalog, settings = {}, ai = null, children }) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -115,6 +143,8 @@ export default function AppProvider({ catalog, settings = {}, children }) {
       <Footer />
       <CartDrawer />
       <BottomNav />
+      <NewsletterPopup />
+      {ai && <AiChat config={ai} />}
     </AppCtx.Provider>
   );
 }

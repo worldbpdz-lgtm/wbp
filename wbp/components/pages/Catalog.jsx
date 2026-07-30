@@ -3,6 +3,7 @@ import React from 'react';
 import { useApp } from '@/components/ctx';
 import { Reveal, Icon, Stars, fmtRating } from '@/components/primitives';
 import ProductCard from '@/components/ProductCard';
+import { brandLogo } from '@/lib/logos';
 
 export default function Catalog() {
   const { t, lang, route, nav, wbp } = useApp();
@@ -29,8 +30,12 @@ export default function Catalog() {
     }
     return true;
   });
+  // Ordre de la vitrine (/admin/showcase) : rang 0 devant, puis les produits
+  // cochés « ★ mis en avant », puis les best-sellers. Vaut aussi bien pour
+  // « tous les produits » que pour les résultats filtrés (catégorie / marque).
+  const feat = (p) => (p.featured ? 1 : 0);
   const sorters = {
-    relevance: (a, b) => (b.badge === 'bestseller') - (a.badge === 'bestseller') || b.rating - a.rating,
+    relevance: (a, b) => wbp.byPick(a, b) || feat(b) - feat(a) || (b.badge === 'bestseller') - (a.badge === 'bestseller') || b.rating - a.rating,
     rating: (a, b) => b.rating - a.rating,
     az: (a, b) => a.name.localeCompare(b.name),
     new: (a, b) => (b.badge === 'new') - (a.badge === 'new') || b.reviews - a.reviews,
@@ -52,15 +57,6 @@ export default function Catalog() {
         ))}
       </div>
       <div className="filt-block">
-        <h4>{t('brands')}</h4>
-        <div className="filt-brands">
-          <button className={`filt-brand ${brand === 'all' ? 'on' : ''}`} onClick={() => setBrand('all')}>{t('all_brands')}</button>
-          {wbp.brands.map((b) => (
-            <button key={b.id} className={`filt-brand ${brand === b.id ? 'on' : ''}`} style={{ '--bc': b.color }} onClick={() => setBrand(b.id)}>{b.short}</button>
-          ))}
-        </div>
-      </div>
-      <div className="filt-block">
         <h4>{t('filter_stars')}</h4>
         <div className="filt-rating">
           {[0, 4, 4.5].map((r) => (
@@ -73,6 +69,35 @@ export default function Catalog() {
       <button className="filt-clear" onClick={() => { setCat('all'); setBrand('all'); setMinRating(0); setQ(''); }}>
         <Icon name="close" size={14} /> {t('clear')}
       </button>
+    </div>
+  );
+
+  // Filtre par marque — bandeau horizontal AU-DESSUS de la barre de recherche.
+  // Chaque puce affiche le vrai logo de la marque + son nom complet.
+  const BrandBar = wbp.brands.length > 0 && (
+    <div className="brand-bar" role="group" aria-label={t('nav_brands')}>
+      <span className="brand-bar-label">{t('nav_brands')}</span>
+      <div className="brand-bar-chips">
+        <button className={`brand-chip brand-chip-all ${brand === 'all' ? 'on' : ''}`} onClick={() => setBrand('all')} aria-pressed={brand === 'all'}>
+          <span className="brand-chip-plate brand-chip-mark"><Icon name="layers" size={15} /></span>
+          <span className="brand-chip-name">{t('all_brands')}</span>
+          <span className="brand-chip-n">{wbp.products.length}</span>
+        </button>
+        {wbp.brands.map((b) => {
+          const logo = brandLogo(b);
+          const n = wbp.products.filter((p) => p.brand === b.id).length;
+          return (
+            <button key={b.id} className={`brand-chip ${brand === b.id ? 'on' : ''}`} style={{ '--bc': b.color }}
+              onClick={() => setBrand(b.id)} title={b.name} aria-pressed={brand === b.id}>
+              {logo
+                ? <span className="brand-chip-plate"><img src={logo} alt="" loading="lazy" /></span>
+                : <span className="brand-chip-plate brand-chip-mark">{(b.short || b.name).slice(0, 2)}</span>}
+              <span className="brand-chip-name">{b.name}</span>
+              <span className="brand-chip-n">{n}</span>
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 
@@ -94,6 +119,7 @@ export default function Catalog() {
               <button key={c.id} className={`catchip ${cat === c.id ? 'on' : ''}`} onClick={() => setCat(c.id)}>{c[lang]}</button>
             ))}
           </div>
+          {BrandBar}
           <div className="cat-bar">
             <div className="cat-search">
               <Icon name="search" size={17} className="search-ico" />

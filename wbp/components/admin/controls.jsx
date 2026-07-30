@@ -2,7 +2,7 @@
 import React, { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import {
-  deleteProduct, toggleProductActive, updateQuoteStatus, deleteQuote,
+  deleteProduct, toggleProductActive, toggleProductFeatured, updateQuoteStatus, deleteQuote,
   updateMessageStatus, deleteMessage, setReviewApproved, deleteReview, deleteSubscriber,
 } from '@/app/admin/actions';
 
@@ -28,6 +28,21 @@ export function ToggleActive({ id, active }) {
   return (
     <button className="adm-btn sm" disabled={pending} onClick={() => run(() => toggleProductActive(id, !active))}>
       {active ? 'Masquer' : 'Activer'}
+    </button>
+  );
+}
+
+// Étoile « mis en avant » : le produit s'affiche en premier dans le catalogue.
+export function ToggleFeatured({ id, featured }) {
+  const [pending, run] = useAct();
+  return (
+    <button
+      className={`adm-btn sm adm-star ${featured ? 'on' : ''}`}
+      disabled={pending}
+      title={featured ? 'Retirer de la mise en avant' : 'Mettre en avant (affiché en premier)'}
+      aria-label={featured ? 'Retirer de la mise en avant' : 'Mettre en avant'}
+      onClick={() => run(() => toggleProductFeatured(id, !featured))}>
+      {pending ? '…' : (featured ? '★' : '☆')}
     </button>
   );
 }

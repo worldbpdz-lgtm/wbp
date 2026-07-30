@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { createAdminClient, hasSupabase } from '@/lib/supabase/server';
-import { ToggleActive, DeleteBtn } from '@/components/admin/controls';
+import { ToggleActive, ToggleFeatured, DeleteBtn } from '@/components/admin/controls';
 
 export const dynamic = 'force-dynamic';
 const PER = 50;
@@ -18,7 +18,11 @@ export default async function ProductsAdmin({ searchParams }) {
   if (q) query = query.or(`name.ilike.%${q}%,code.ilike.%${q}%`);
   if (filter === 'active') query = query.eq('active', true);
   if (filter === 'hidden') query = query.eq('active', false);
+  if (filter === 'featured') query = query.eq('featured', true);
   const { data: products, count } = await query.order('active', { ascending: false }).order('sort').range((page - 1) * PER, page * PER - 1);
+  // Les produits mis en avant remontent en tête de page (tri en mémoire pour
+  // rester compatible tant que la migration featured.sql n'est pas appliquée).
+  (products || []).sort((a, b) => (b.featured ? 1 : 0) - (a.featured ? 1 : 0));
   const { data: brands } = await sb.from('brands').select('id,name');
   const bmap = Object.fromEntries((brands || []).map((b) => [b.id, b.name]));
   const total = count || 0; const pages = Math.max(1, Math.ceil(total / PER));
@@ -27,7 +31,7 @@ export default async function ProductsAdmin({ searchParams }) {
   return (
     <>
       <div className="adm-head">
-        <div><h1 className="adm-h1">Produits</h1><p className="adm-sub">{total} produit(s){filter !== 'all' ? ` · ${filter === 'active' ? 'visibles' : 'masqués'}` : ''}{q ? ` · recherche « ${q} »` : ''}.</p></div>
+        <div><h1 className="adm-h1">Produits</h1><p className="adm-sub">{total} produit(s){filter !== 'all' ? ` · ${{ active: 'visibles', hidden: 'masqués', featured: 'mis en avant' }[filter] || filter}` : ''}{q ? ` · recherche « ${q} »` : ''}. L’étoile ★ met un produit en avant : il apparaît en premier dans le catalogue.</p></div>
         <Link className="adm-btn primary" href="/admin/products/new">+ Nouveau produit</Link>
       </div>
 
@@ -37,6 +41,7 @@ export default async function ProductsAdmin({ searchParams }) {
           <option value="all">Tous</option>
           <option value="active">Visibles</option>
           <option value="hidden">Masqués</option>
+          <option value="featured">Mis en avant ★</option>
         </select>
         <button className="adm-btn primary" type="submit">Filtrer</button>
         {(q || filter !== 'all') && <Link className="adm-btn" href="/admin/products">Réinitialiser</Link>}
@@ -53,8 +58,12 @@ export default async function ProductsAdmin({ searchParams }) {
                 <td><span className="adm-muted">{p.cat}</span></td>
                 <td>{bmap[p.brand] || '—'}</td>
                 <td className="adm-muted">{dz(p.price)}</td>
-                <td><span className={`adm-tag ${p.active ? 'ok' : 'gray'}`}>{p.active ? 'Visible' : 'Masqué'}</span></td>
+                <td>
+                  <span className={`adm-tag ${p.active ? 'ok' : 'gray'}`}>{p.active ? 'Visible' : 'Masqué'}</span>
+                  {p.featured && <span className="adm-tag warn" style={{ marginInlineStart: 6 }}>★ En avant</span>}
+                </td>
                 <td><div className="adm-actions">
+                  <ToggleFeatured id={p.id} featured={!!p.featured} />
                   <Link className="adm-btn sm" href={`/admin/products/${p.id}`}>Éditer</Link>
                   <ToggleActive id={p.id} active={p.active} />
                   <DeleteBtn kind="product" id={p.id} />

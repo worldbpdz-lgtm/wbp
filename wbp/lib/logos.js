@@ -27,8 +27,14 @@ const BRAND_LOGOS = {
 // WBP's own company emblem (not a product brand) — used e.g. in the email header.
 export const WBP_LOGO = '/logos/wbp.png';
 
+// Le logo choisi dans /admin/brands (colonne brands.logo_url) gagne toujours ;
+// on retombe sur les fichiers livrés dans /public/logos/brands pour les marques
+// historiques qui n'ont pas encore d'upload.
 export const brandLogo = (b) =>
-  (b && (BRAND_LOGOS[norm(b.id)] || BRAND_LOGOS[norm(b.short)] || BRAND_LOGOS[norm(b.name)])) || null;
+  (b && (b.logo_url || BRAND_LOGOS[norm(b.id)] || BRAND_LOGOS[norm(b.short)] || BRAND_LOGOS[norm(b.name)])) || null;
+
+// Image d'illustration d'une catégorie (uploadée depuis /admin/categories).
+export const categoryImage = (c) => (c && c.image_url) || null;
 
 // ----- Clients (trusted-by slider), in display order, each with its logo -----
 export const CLIENTS = [

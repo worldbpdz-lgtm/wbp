@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { createAdminClient, hasSupabase } from '@/lib/supabase/server';
 import { createCampaign } from '@/app/admin/actions';
+import { SITE } from '@/lib/site';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,7 +14,7 @@ const STATUS = {
 export default async function Campaigns() {
   if (!hasSupabase()) return null;
   const sb = createAdminClient();
-  const { data } = await sb.from('email_campaigns').select('*').order('created_at', { ascending: false }).limit(500);
+  const { data } = await sb.from('email_campaigns').select('*').eq('site', SITE).order('created_at', { ascending: false }).limit(500);
 
   return (
     <>

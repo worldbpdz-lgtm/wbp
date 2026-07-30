@@ -1,10 +1,11 @@
 import { createAdminClient, hasSupabase } from '@/lib/supabase/server';
 import { StatusSelect, DeleteBtn } from '@/components/admin/controls';
+import { SITE } from '@/lib/site';
 export const dynamic = 'force-dynamic';
 export default async function Messages() {
   if (!hasSupabase()) return null;
   const sb = createAdminClient();
-  const { data } = await sb.from('contact_messages').select('*').order('created_at', { ascending: false });
+  const { data } = await sb.from('contact_messages').select('*').eq('site', SITE).order('created_at', { ascending: false });
   return (
     <>
       <h1 className="adm-h1">Messages de contact</h1>

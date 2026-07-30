@@ -1,4 +1,5 @@
 import { createAdminClient, hasSupabase } from '@/lib/supabase/server';
+import { SITE } from '@/lib/site';
 
 const DAY = 86400000;
 const ymd = (d) => new Date(d).toISOString().slice(0, 10);
@@ -13,13 +14,13 @@ export async function getDashboard() {
     const sb = createAdminClient();
     const since = new Date(Date.now() - 30 * DAY).toISOString();
     const [ev, quotes, msgs, reviews, products, cats, subsRes] = await Promise.all([
-      sb.from('events').select('type,product_id,device,session_id,created_at').gte('created_at', since).limit(20000),
-      sb.from('quote_requests').select('id,customer_name,company,email,status,created_at').order('created_at', { ascending: false }).limit(2000),
-      sb.from('contact_messages').select('id,name,subject,status,created_at').order('created_at', { ascending: false }).limit(2000),
-      sb.from('reviews').select('id,product_id,author,rating,approved,created_at').order('created_at', { ascending: false }).limit(2000),
+      sb.from('events').select('type,product_id,device,session_id,created_at').eq('site', SITE).gte('created_at', since).limit(20000),
+      sb.from('quote_requests').select('id,customer_name,company,email,status,created_at').eq('site', SITE).order('created_at', { ascending: false }).limit(2000),
+      sb.from('contact_messages').select('id,name,subject,status,created_at').eq('site', SITE).order('created_at', { ascending: false }).limit(2000),
+      sb.from('reviews').select('id,product_id,author,rating,approved,created_at').eq('site', SITE).order('created_at', { ascending: false }).limit(2000),
       sb.from('products').select('id,name,cat,active'),
       sb.from('categories').select('id,name'),
-      sb.from('newsletter_subscribers').select('id', { count: 'exact', head: true }),
+      sb.from('newsletter_subscribers').select('id', { count: 'exact', head: true }).eq('site', SITE),
     ]);
     const events = ev.data || [], Q = quotes.data || [], M = msgs.data || [], R = reviews.data || [], P = products.data || [], C = cats.data || [];
     const pname = Object.fromEntries(P.map((p) => [p.id, p.name]));
@@ -75,7 +76,7 @@ export async function getAnalytics() {
     const sb = createAdminClient();
     const since = new Date(Date.now() - 30 * DAY).toISOString();
     const [ev, products] = await Promise.all([
-      sb.from('events').select('type,path,product_id,device,referrer,session_id,created_at').gte('created_at', since).limit(40000),
+      sb.from('events').select('type,path,product_id,device,referrer,session_id,created_at').eq('site', SITE).gte('created_at', since).limit(40000),
       sb.from('products').select('id,name'),
     ]);
     const events = ev.data || [], pname = Object.fromEntries((products.data || []).map((p) => [p.id, p.name]));

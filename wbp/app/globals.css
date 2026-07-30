@@ -1,6 +1,10 @@
 @import '../styles/fonts.css';
 @import '../styles/styles.css';
 @import '../styles/styles2.css';
+/* Mise à niveau UI 2026 — boutons, cartes, pop-up newsletter, chat assistant.
+   Chargée en dernier pour surcharger proprement les règles ci-dessus ; retirez
+   cette ligne et le site retrouve exactement son ancienne apparence. */
+@import '../styles/ui-2026.css';
 
 /* quote modal items + misc additions for the full-stack build */
 .quote-items{margin:4px 0 2px;display:flex;flex-direction:column;gap:6px}
@@ -173,6 +177,15 @@ html, body { overflow-x: visible; }
     scrollbar-width: none; -webkit-overflow-scrolling: touch; }
   .catchips::-webkit-scrollbar { display: none; }
   .catchip { flex: 0 0 auto; white-space: nowrap; padding: 8px 14px; font-size: 12.5px; }
+
+  /* Brand chips row above the search bar — compact logos, swipeable */
+  .brand-bar { gap: 8px; margin: 0 0 10px; }
+  .brand-bar-label { display: none; }                /* the logos carry the meaning on phones */
+  .brand-bar .brand-chip { gap: 7px; padding-inline: 5px 11px; }
+  .brand-chip-plate { height: 26px; min-width: 26px; padding: 2px 6px; }
+  .brand-chip-plate img { max-height: 17px; max-width: 56px; }
+  .brand-chip-name { font-size: 12.5px; }
+  .brand-chip-n { display: none; }                   /* keep the row short & swipeable */
 
   .cat-count-row { font-size: 12.5px; margin: 0 0 10px; }
 

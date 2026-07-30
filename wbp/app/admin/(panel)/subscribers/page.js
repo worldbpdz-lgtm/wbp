@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { createAdminClient, hasSupabase } from '@/lib/supabase/server';
 import { DeleteBtn } from '@/components/admin/controls';
+import { SITE } from '@/lib/site';
 
 export const dynamic = 'force-dynamic';
 
@@ -31,14 +32,14 @@ export default async function Subscribers({ searchParams }) {
   const status = STATUSES.includes(sp.status) ? sp.status : '';
   const sb = createAdminClient();
 
-  let query = sb.from('newsletter_subscribers').select('*').order('created_at', { ascending: false }).limit(2000);
+  let query = sb.from('newsletter_subscribers').select('*').eq('site', SITE).order('created_at', { ascending: false }).limit(2000);
   if (status) query = query.eq('status', status);
   if (q) query = query.ilike('email', `%${q}%`);
   const { data } = await query;
 
   const counts = {};
   await Promise.all(STATUSES.map(async (st) => {
-    const { count } = await sb.from('newsletter_subscribers').select('id', { count: 'exact', head: true }).eq('status', st);
+    const { count } = await sb.from('newsletter_subscribers').select('id', { count: 'exact', head: true }).eq('site', SITE).eq('status', st);
     counts[st] = count || 0;
   }));
   const total = STATUSES.reduce((a, st) => a + counts[st], 0);

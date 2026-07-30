@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation';
 import { createAdminClient, hasSupabase } from '@/lib/supabase/server';
 import { emailConfigured } from '@/lib/email/send';
 import CampaignEditor from '@/components/admin/CampaignEditor';
+import { SITE } from '@/lib/site';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,7 +17,7 @@ export default async function CampaignPage({ params }) {
     sb.from('email_campaign_sends').select('id', { count: 'exact', head: true }).eq('campaign_id', id),
     sb.from('email_campaign_sends').select('id', { count: 'exact', head: true }).eq('campaign_id', id).not('opened_at', 'is', null),
     sb.from('email_campaign_sends').select('id', { count: 'exact', head: true }).eq('campaign_id', id).not('clicked_at', 'is', null),
-    sb.from('newsletter_subscribers').select('id', { count: 'exact', head: true }).eq('status', 'subscribed'),
+    sb.from('newsletter_subscribers').select('id', { count: 'exact', head: true }).eq('site', SITE).eq('status', 'subscribed'),
   ]);
   const stats = { sent: sentR.count || 0, opened: openR.count || 0, clicked: clickR.count || 0, audience: audienceR.count || 0 };
 

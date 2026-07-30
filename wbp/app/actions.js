@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { createAdminClient, hasSupabase } from '@/lib/supabase/server';
 import { sendEmail, siteUrl } from '@/lib/email/send';
 import { confirmEmailHtml } from '@/lib/email/template';
+import { SITE } from '@/lib/site';
 
 const str = (v, max = 2000) => (v == null ? null : String(v).slice(0, max).trim() || null);
 const isEmail = (e) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e || '');
@@ -10,6 +11,7 @@ const normLang = (l) => (['fr', 'en', 'ar'].includes(l) ? l : 'fr');
 
 export async function submitQuote(payload) {
   const row = {
+    site: SITE,
     customer_name: str(payload.customer_name, 200),
     company: str(payload.company, 200),
     email: str(payload.email, 200),
@@ -28,6 +30,7 @@ export async function submitQuote(payload) {
 
 export async function submitContact(payload) {
   const row = {
+    site: SITE,
     name: str(payload.name, 200), company: str(payload.company, 200),
     email: str(payload.email, 200), phone: str(payload.phone, 60),
     subject: str(payload.subject, 300), message: str(payload.message, 5000),
@@ -43,6 +46,7 @@ export async function submitReview(payload) {
   const rating = Math.min(5, Math.max(1, parseInt(payload.rating, 10) || 0));
   if (!payload.product_id || !rating || !str(payload.body)) return { ok: false, error: 'invalid' };
   const row = {
+    site: SITE,
     product_id: str(payload.product_id, 60), author: str(payload.author, 120) || 'Anonyme',
     rating, title: str(payload.title, 200), body: str(payload.body, 4000),
     verified: false, approved: true,
@@ -62,12 +66,12 @@ export async function subscribeNewsletter(email, lang = 'fr') {
   if (!hasSupabase()) return { ok: true, stored: false, pending: true };
   const sb = createAdminClient();
   const { data: existing } = await sb
-    .from('newsletter_subscribers').select('id,status,token').eq('email', e).maybeSingle();
+    .from('newsletter_subscribers').select('id,status,token').eq('site', SITE).eq('email', e).maybeSingle();
   if (existing && existing.status === 'subscribed') return { ok: true, stored: true, already: true };
   const token = existing?.token || randomUUID().replace(/-/g, '');
   const { error } = await sb
     .from('newsletter_subscribers')
-    .upsert({ email: e, status: 'pending', token, lang: L, source: 'website' }, { onConflict: 'email' });
+    .upsert({ site: SITE, email: e, status: 'pending', token, lang: L, source: 'website' }, { onConflict: 'site,email' });
   if (error) return { ok: false, error: error.message };
   const confirmUrl = `${siteUrl()}/newsletter/confirm?token=${token}&lang=${L}`;
   const subject = L === 'ar' ? 'أكد اشتراكك — World Business Plus'
@@ -125,6 +129,7 @@ export async function trackEvent({ type, path, productId, sessionId } = {}) {
     const referrer = h.get('referer') || null;
     const sb = createAdminClient();
     await sb.from('events').insert({
+      site: SITE,
       type: t,
       path: str(path, 300),
       product_id: str(productId, 60),
