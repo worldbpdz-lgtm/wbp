@@ -4,10 +4,12 @@ import { useApp } from '@/components/ctx';
 import { Reveal, Icon, Stars, fmtRating } from '@/components/primitives';
 import ProductCard from '@/components/ProductCard';
 import { brandLogo } from '@/lib/logos';
+import { subcatsFor, subcatById, resolveSubcat, countSubcats } from '@/lib/subcategories';
 
 export default function Catalog() {
   const { t, lang, route, nav, wbp } = useApp();
   const [cat, setCat] = React.useState(route.params.cat || 'all');
+  const [sub, setSub] = React.useState(route.params.sub || 'all');
   const [brand, setBrand] = React.useState(route.params.brand || 'all');
   const [q, setQ] = React.useState(route.params.q || '');
   const [minRating, setMinRating] = React.useState(0);
@@ -16,12 +18,30 @@ export default function Catalog() {
   const PAGE = 24; // mobile-friendly page size for "load more" pagination
   const [visible, setVisible] = React.useState(PAGE);
 
-  React.useEffect(() => { setCat(route.params.cat || 'all'); setBrand(route.params.brand || 'all'); setQ(route.params.q || ''); }, [route.params.cat, route.params.brand, route.params.q]);
+  React.useEffect(() => {
+    setCat(route.params.cat || 'all'); setSub(route.params.sub || 'all');
+    setBrand(route.params.brand || 'all'); setQ(route.params.q || '');
+  }, [route.params.cat, route.params.sub, route.params.brand, route.params.q]);
   // Reset the visible window whenever the result set changes (filter / search / sort).
-  React.useEffect(() => { setVisible(PAGE); }, [cat, brand, q, minRating, sort]);
+  React.useEffect(() => { setVisible(PAGE); }, [cat, sub, brand, q, minRating, sort]);
+
+  // ── Sous-types (ex. incendie : adressable vs conventionnel) ────────────────
+  // Une centrale adressable et une conventionnelle ne se montent pas ensemble :
+  // on laisse donc l'utilisateur trancher avant de parcourir la liste.
+  const subList = subcatsFor(cat);
+  const subCounts = React.useMemo(() => (subList.length ? countSubcats(wbp.products, cat) : {}), [subList.length, wbp.products, cat]);
+  const visibleSubs = subList.filter((s) => (subCounts[s.id] || 0) > 0);
+  const activeSub = subList.length && sub !== 'all' ? subcatById(cat, sub) : null;
+  // Un sous-type qui n'existe pas (URL bricolée, catégorie changée) est ignoré.
+  const subFilter = activeSub && (subCounts[activeSub.id] || 0) > 0 ? activeSub.id : null;
+
+  // Changer de catégorie remet toujours le sous-type à zéro : « adressable »
+  // n'a aucun sens une fois qu'on est passé sur « Vidéosurveillance ».
+  const pickCat = React.useCallback((id) => { setCat(id); setSub('all'); }, []);
 
   let list = wbp.products.filter((p) => {
     if (cat !== 'all' && p.cat !== cat) return false;
+    if (subFilter && resolveSubcat(p) !== subFilter) return false;
     if (brand !== 'all' && p.brand !== brand) return false;
     if (p.rating < minRating) return false;
     if (q.trim()) {
@@ -49,9 +69,9 @@ export default function Catalog() {
     <div className="cat-filters">
       <div className="filt-block">
         <h4>{t('categories')}</h4>
-        <button className={`filt-opt ${cat === 'all' ? 'on' : ''}`} onClick={() => setCat('all')}>{t('all_categories')}<span>{wbp.products.length}</span></button>
+        <button className={`filt-opt ${cat === 'all' ? 'on' : ''}`} onClick={() => pickCat('all')}>{t('all_categories')}<span>{wbp.products.length}</span></button>
         {wbp.categories.map((c) => (
-          <button key={c.id} className={`filt-opt ${cat === c.id ? 'on' : ''}`} onClick={() => setCat(c.id)}>
+          <button key={c.id} className={`filt-opt ${cat === c.id ? 'on' : ''}`} onClick={() => pickCat(c.id)}>
             <Icon name={c.icon} size={16} />{c[lang]}<span>{wbp.products.filter((p) => p.cat === c.id).length}</span>
           </button>
         ))}
@@ -66,7 +86,7 @@ export default function Catalog() {
           ))}
         </div>
       </div>
-      <button className="filt-clear" onClick={() => { setCat('all'); setBrand('all'); setMinRating(0); setQ(''); }}>
+      <button className="filt-clear" onClick={() => { pickCat('all'); setBrand('all'); setMinRating(0); setQ(''); }}>
         <Icon name="close" size={14} /> {t('clear')}
       </button>
     </div>
@@ -134,20 +154,51 @@ export default function Catalog() {
     <main className="page-catalog">
       <div className="cat-hero">
         <div className="wrap">
-          <nav className="crumbs"><button onClick={() => nav('home')}>{t('nav_home')}</button><Icon name="chevright" size={13} /><span>{heroTitle}</span></nav>
-          <Reveal as="h1" className="cat-hero-title">{heroTitle}</Reveal>
-          {activeCat && <Reveal as="p" className="cat-hero-sub" delay={80}>{activeCat.blurb[lang] || activeCat.blurb.fr}</Reveal>}
+          <nav className="crumbs">
+            <button onClick={() => nav('home')}>{t('nav_home')}</button><Icon name="chevright" size={13} />
+            {subFilter
+              ? (<><button onClick={() => setSub('all')}>{heroTitle}</button><Icon name="chevright" size={13} /><span>{activeSub[lang] || activeSub.fr}</span></>)
+              : <span>{heroTitle}</span>}
+          </nav>
+          <Reveal as="h1" className="cat-hero-title">
+            {heroTitle}{subFilter && <span className="cat-hero-sub-tag"> · {activeSub[lang] || activeSub.fr}</span>}
+          </Reveal>
+          {activeCat && (
+            <Reveal as="p" className="cat-hero-sub" delay={80}>
+              {subFilter
+                ? (activeSub.blurb?.[lang] || activeSub.blurb?.fr)
+                : (activeCat.blurb[lang] || activeCat.blurb.fr)}
+            </Reveal>
+          )}
         </div>
       </div>
       <div className="wrap cat-layout">
         <aside className="cat-side">{FilterPanel}</aside>
         <div className="cat-main">
           <div className="catchips">
-            <button className={`catchip ${cat === 'all' ? 'on' : ''}`} onClick={() => setCat('all')}>{t('all_categories')}</button>
+            <button className={`catchip ${cat === 'all' ? 'on' : ''}`} onClick={() => pickCat('all')}>{t('all_categories')}</button>
             {wbp.categories.map((c) => (
-              <button key={c.id} className={`catchip ${cat === c.id ? 'on' : ''}`} onClick={() => setCat(c.id)}>{c[lang]}</button>
+              <button key={c.id} className={`catchip ${cat === c.id ? 'on' : ''}`} onClick={() => pickCat(c.id)}>{c[lang]}</button>
             ))}
           </div>
+          {visibleSubs.length > 1 && (
+            <div className="subcat-bar" role="group" aria-label={t('sub_type')}>
+              <span className="subcat-label"><Icon name="layers" size={14} /> {t('sub_type')}</span>
+              <div className="subcat-chips">
+                <button type="button" className={`subcat-chip ${!subFilter ? 'on' : ''}`}
+                  onClick={() => setSub('all')} aria-pressed={!subFilter}>
+                  {t('all_types')}<span className="subcat-n">{wbp.products.filter((p) => p.cat === cat).length}</span>
+                </button>
+                {visibleSubs.map((s) => (
+                  <button key={s.id} type="button" className={`subcat-chip ${subFilter === s.id ? 'on' : ''}`}
+                    onClick={() => setSub(subFilter === s.id ? 'all' : s.id)} aria-pressed={subFilter === s.id}
+                    title={s.blurb?.[lang] || s.blurb?.fr || ''}>
+                    <Icon name={s.icon} size={15} />{s[lang] || s.fr}<span className="subcat-n">{subCounts[s.id]}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           {BrandBar}
           <div className="cat-bar">
             <div className="cat-search">
@@ -169,7 +220,10 @@ export default function Catalog() {
           <div className="cat-count-row"><span><b>{list.length}</b> {list.length > 1 ? t('results') : t('result_one')}</span></div>
           {showFilters && <div className="cat-filters-mobile">{FilterPanel}</div>}
           {list.length === 0 ? (
-            <div className="cat-empty"><Icon name="search" size={40} stroke={1.2} /><p>{t('no_results')}</p></div>
+            <div className="cat-empty">
+              <Icon name="search" size={40} stroke={1.2} /><p>{t('no_results')}</p>
+              {subFilter && <button className="cat-more-btn" onClick={() => setSub('all')}>{t('all_types')}</button>}
+            </div>
           ) : (
             <>
               <div className="prod-grid">{list.slice(0, visible).map((p, i) => <ProductCard key={p.id} product={p} index={i} />)}</div>

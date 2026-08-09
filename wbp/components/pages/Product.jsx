@@ -4,6 +4,266 @@ import { useApp } from '@/components/ctx';
 import { Reveal, Icon, Stars, Badge, ProductImage, SectionHead, Btn, fmtRating, scrollTopSmooth } from '@/components/primitives';
 import ProductCard from '@/components/ProductCard';
 import { submitReview } from '@/app/actions';
+import { resolveSubcat, subcatById } from '@/lib/subcategories';
+
+/* ============================================================================
+   GALERIE PRODUIT — vrai carrousel
+   ----------------------------------------------------------------------------
+   Une piste en scroll-snap : le glissement tactile est natif (donc fluide sur
+   mobile), et on ajoute par-dessus les flèches, le clavier, le glisser-déposer
+   à la souris, la loupe au survol et une vue plein écran.
+   ========================================================================== */
+function useRtl(ref) {
+  const [rtl, setRtl] = React.useState(false);
+  React.useEffect(() => {
+    const el = ref.current; if (!el) return;
+    setRtl(getComputedStyle(el).direction === 'rtl');
+  }, [ref]);
+  return rtl;
+}
+
+/* La vue plein écran garde son propre index : le carrousel du fond n'est
+   repositionné qu'à la fermeture, pour ne pas l'animer derrière la modale. */
+function Lightbox({ shots, start, onClose, alt }) {
+  const [n, setN] = React.useState(start);
+  const step = React.useCallback((d) => setN((c) => (c + d + shots.length) % shots.length), [shots.length]);
+
+  // Refs pour que le gestionnaire clavier (attaché une seule fois) voie
+  // toujours l'index courant et la dernière closure onClose.
+  const latest = React.useRef({ n, onClose });
+  latest.current = { n, onClose };
+
+  React.useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === 'Escape') { e.preventDefault(); latest.current.onClose(latest.current.n); }
+      if (e.key === 'ArrowRight') { e.preventDefault(); step(1); }
+      if (e.key === 'ArrowLeft') { e.preventDefault(); step(-1); }
+    };
+    document.addEventListener('keydown', onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.removeEventListener('keydown', onKey); document.body.style.overflow = prev; };
+  }, [step]);
+
+  const close = () => onClose(n);
+  return (
+    <div className="lbx" onClick={close} role="dialog" aria-modal="true" aria-label={alt}>
+      <button className="lbx-close" onClick={close} aria-label="Fermer"><Icon name="close" size={20} /></button>
+      {shots.length > 1 && (
+        <button className="lbx-nav prev" aria-label="Précédent"
+          onClick={(e) => { e.stopPropagation(); step(-1); }}>
+          <Icon name="chevleft" size={26} />
+        </button>
+      )}
+      <img className="lbx-img" src={shots[n]} alt={alt} onClick={(e) => e.stopPropagation()} />
+      {shots.length > 1 && (
+        <button className="lbx-nav next" aria-label="Suivant"
+          onClick={(e) => { e.stopPropagation(); step(1); }}>
+          <Icon name="chevright" size={26} />
+        </button>
+      )}
+      {shots.length > 1 && <span className="lbx-count">{n + 1} / {shots.length}</span>}
+    </div>
+  );
+}
+
+function Gallery({ product, brand }) {
+  const shots = React.useMemo(() => {
+    const imgs = Array.isArray(product.images) ? product.images.filter(Boolean) : [];
+    if (imgs.length) return imgs;
+    return product.image_url ? [product.image_url] : [];
+  }, [product.images, product.image_url]);
+
+  const many = shots.length > 1;
+  const [i, setI] = React.useState(0);
+  const [zoom, setZoom] = React.useState(null);   // { x, y } en %
+  const [box, setBox] = React.useState(false);    // plein écran
+  const trackRef = React.useRef(null);
+  const thumbsRef = React.useRef(null);
+  const rtl = useRtl(trackRef);
+
+  React.useEffect(() => { setI(0); setZoom(null); }, [product.id]);
+
+  const goTo = React.useCallback((n, smooth = true) => {
+    const el = trackRef.current;
+    const next = Math.max(0, Math.min(shots.length - 1, n));
+    setI(next);
+    if (!el) return;
+    // « instant » et pas « auto » : auto délègue au scroll-behavior CSS (smooth).
+    el.scrollTo({ left: (rtl ? -1 : 1) * next * el.clientWidth, behavior: smooth ? 'smooth' : 'instant' });
+  }, [rtl, shots.length]);
+
+  // La piste fait foi : on lit l'index depuis la position réelle du scroll,
+  // ce qui garde les puces et les vignettes justes après un swipe.
+  const onScroll = React.useCallback(() => {
+    const el = trackRef.current; if (!el || !el.clientWidth) return;
+    const n = Math.round(Math.abs(el.scrollLeft) / el.clientWidth);
+    setI((cur) => (n !== cur && n >= 0 && n < shots.length ? n : cur));
+  }, [shots.length]);
+
+  // Vignette active toujours visible dans la bande.
+  React.useEffect(() => {
+    const strip = thumbsRef.current; if (!strip) return;
+    const btn = strip.children[i];
+    btn?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+  }, [i]);
+
+  // Glisser-déposer à la souris (le tactile est déjà géré nativement).
+  // Un déplacement de 15 % de la largeur suffit à changer de vue : exiger la
+  // moitié donnerait l'impression que le glissement « ne prend pas ».
+  const drag = React.useRef(null);
+  const onPointerDown = (e) => {
+    if (e.pointerType === 'touch' || !many) return;
+    drag.current = { x: e.clientX, left: trackRef.current.scrollLeft, from: i, moved: false };
+    trackRef.current.classList.add('dragging');
+  };
+  const onPointerMove = (e) => {
+    const d = drag.current; if (!d) return;
+    const dx = e.clientX - d.x;
+    if (Math.abs(dx) > 3) d.moved = true;
+    trackRef.current.scrollLeft = d.left - dx;
+  };
+  const endDrag = (e) => {
+    const d = drag.current; if (!d) return;
+    drag.current = null;
+    const el = trackRef.current;
+    el.classList.remove('dragging');
+    if (!d.moved) return;
+    const dx = (e && typeof e.clientX === 'number' ? e.clientX : d.x) - d.x;
+    const step = Math.abs(dx) > el.clientWidth * 0.15 ? (dx < 0 ? 1 : -1) : 0;
+    goTo(d.from + (rtl ? -step : step));
+  };
+
+  const onKey = (e) => {
+    if (!many) return;
+    if (e.key === 'ArrowRight') { e.preventDefault(); goTo(rtl ? i - 1 : i + 1); }
+    if (e.key === 'ArrowLeft') { e.preventDefault(); goTo(rtl ? i + 1 : i - 1); }
+  };
+
+  const onMove = (e) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    setZoom({ x: ((e.clientX - r.left) / r.width) * 100, y: ((e.clientY - r.top) / r.height) * 100 });
+  };
+
+  // Aucune photo : on garde le visuel de repli généré (icône + logo de marque).
+  if (!shots.length) {
+    return (
+      <div className="pp-gallery">
+        <Reveal className="pp-stage">
+          <Badge kind={product.badge} />
+          <div className="pp-stage-img"><ProductImage product={product} size="hero" /></div>
+          <span className="pp-brand-chip" style={{ '--bc': brand.color }}>{brand.short}</span>
+        </Reveal>
+      </div>
+    );
+  }
+
+  return (
+    <div className="pp-gallery">
+      <Reveal className={`pp-stage ${many ? 'has-nav' : ''}`}>
+        <Badge kind={product.badge} />
+        <div
+          className="pp-track" ref={trackRef} onScroll={onScroll} onKeyDown={onKey}
+          tabIndex={0} role="region" aria-roledescription="carousel" aria-label={product.name}
+          onPointerDown={onPointerDown} onPointerMove={onPointerMove}
+          onPointerUp={endDrag} onPointerCancel={endDrag} onPointerLeave={endDrag}
+        >
+          {shots.map((src, n) => (
+            <div className="pp-slide" key={n} role="group" aria-roledescription="slide"
+              aria-label={`${n + 1} / ${shots.length}`}
+              onMouseMove={onMove} onMouseLeave={() => setZoom(null)}>
+              <img
+                src={src} alt={`${product.name} — vue ${n + 1}`} draggable="false"
+                loading={n === 0 ? 'eager' : 'lazy'}
+                style={n === i && zoom ? { transform: 'scale(2)', transformOrigin: `${zoom.x}% ${zoom.y}%` } : undefined}
+              />
+            </div>
+          ))}
+        </div>
+
+        {many && (
+          <>
+            <button type="button" className="pp-arrow prev" onClick={() => goTo(i - 1)} disabled={i === 0} aria-label="Image précédente">
+              <Icon name="chevleft" size={20} />
+            </button>
+            <button type="button" className="pp-arrow next" onClick={() => goTo(i + 1)} disabled={i === shots.length - 1} aria-label="Image suivante">
+              <Icon name="chevright" size={20} />
+            </button>
+            <div className="pp-dots" role="tablist">
+              {shots.map((_, n) => (
+                <button key={n} type="button" className={`pp-dot ${n === i ? 'on' : ''}`} role="tab"
+                  aria-selected={n === i} aria-label={`Image ${n + 1}`} onClick={() => goTo(n)} />
+              ))}
+            </div>
+            <span className="pp-counter">{i + 1} / {shots.length}</span>
+          </>
+        )}
+
+        <button type="button" className="pp-expand" onClick={() => setBox(true)} aria-label="Agrandir l’image">
+          <Icon name="zoom" size={17} />
+        </button>
+        <span className="pp-brand-chip" style={{ '--bc': brand.color }}>{brand.short}</span>
+      </Reveal>
+
+      {many && (
+        <div className="pp-thumbs" ref={thumbsRef}>
+          {shots.map((src, n) => (
+            <button key={n} type="button" className={`pp-thumb ${i === n ? 'on' : ''}`}
+              onClick={() => goTo(n)} aria-label={`Voir l’image ${n + 1}`} aria-current={i === n}>
+              <img src={src} alt="" loading="lazy" draggable="false" />
+            </button>
+          ))}
+        </div>
+      )}
+
+      {box && <Lightbox shots={shots} start={i} alt={product.name}
+        onClose={(n) => { setBox(false); goTo(n, false); }} />}
+    </div>
+  );
+}
+
+/* ============================================================================
+   RAIL — carrousel horizontal de cartes produit (« Produits similaires »)
+   ========================================================================== */
+function Rail({ children, label }) {
+  const ref = React.useRef(null);
+  const [edge, setEdge] = React.useState({ l: false, r: false });
+
+  const sync = React.useCallback(() => {
+    const el = ref.current; if (!el) return;
+    const max = el.scrollWidth - el.clientWidth;
+    const x = Math.abs(el.scrollLeft);          // scrollLeft est négatif en RTL
+    setEdge({ l: x > 6, r: x < max - 6 });
+  }, []);
+
+  React.useEffect(() => {
+    sync();
+    window.addEventListener('resize', sync);
+    return () => window.removeEventListener('resize', sync);
+  }, [sync, children]);
+
+  const scroll = (dir) => {
+    const el = ref.current; if (!el) return;
+    const rtl = getComputedStyle(el).direction === 'rtl';
+    const card = el.firstElementChild?.getBoundingClientRect().width || 260;
+    const step = Math.max(card + 18, el.clientWidth * 0.8);
+    el.scrollBy({ left: dir * (rtl ? -1 : 1) * step, behavior: 'smooth' });
+  };
+
+  return (
+    <div className={`rail ${edge.l ? 'can-l' : ''} ${edge.r ? 'can-r' : ''}`}>
+      <button type="button" className="rail-nav prev" onClick={() => scroll(-1)} aria-label="Précédent" tabIndex={-1}>
+        <Icon name="chevleft" size={18} />
+      </button>
+      <div className="rail-track" ref={ref} onScroll={sync} role="group" aria-label={label}>
+        {children}
+      </div>
+      <button type="button" className="rail-nav next" onClick={() => scroll(1)} aria-label="Suivant" tabIndex={-1}>
+        <Icon name="chevright" size={18} />
+      </button>
+    </div>
+  );
+}
 
 function FicheModal({ product, brand, onClose }) {
   const { t, lang, wbp } = useApp();
@@ -172,16 +432,26 @@ export default function Product({ product, initialReviews }) {
   const [tab, setTab] = React.useState('overview');
   const [added, setAdded] = React.useState(false);
   const [ficheOpen, setFicheOpen] = React.useState(false);
-  const [activeShot, setActiveShot] = React.useState(0);
   const reviewsRef = React.useRef(null);
 
-  React.useEffect(() => { setQty(1); setTab('overview'); setActiveShot(0); scrollTopSmooth(); }, [product.id]);
+  React.useEffect(() => { setQty(1); setTab('overview'); scrollTopSmooth(); }, [product.id]);
 
-  const similar = wbp.products.filter((p) => p.cat === product.cat && p.id !== product.id).slice(0, 4);
+  // Sous-type (ex. incendie adressable / conventionnel) : deux systèmes qui ne
+  // se montent pas ensemble, on le signale et on privilégie les mêmes en bas.
+  const subId = resolveSubcat(product);
+  const sub = subId ? subcatById(product.cat, subId) : null;
+
+  // « Similaires » : même sous-type d'abord, puis même marque, puis le reste de
+  // la catégorie. Jusqu'à 12 références — le rail en montre autant qu'il peut.
+  const similar = React.useMemo(() => {
+    const pool = wbp.products.filter((p) => p.cat === product.cat && p.id !== product.id);
+    const score = (p) => (subId && resolveSubcat(p) === subId ? 4 : 0) + (p.brand === product.brand ? 2 : 0) + (p.badge === 'bestseller' ? 1 : 0);
+    return [...pool].sort((a, b) => score(b) - score(a) || b.rating - a.rating).slice(0, 12);
+  }, [wbp.products, product.cat, product.id, product.brand, subId]);
+
   const waText = encodeURIComponent(`Bonjour World Business Plus,\nJe suis intéressé par : ${product.name} (${product.code}).\nQuantité souhaitée : ${qty}.\nMerci de m'envoyer un devis.`);
   const waLink = `https://wa.me/${wbp.WHATSAPP}?text=${waText}`;
   const tag = product.tag[lang] || product.tag.fr;
-  const gallery = (product.images && product.images.length) ? product.images : null;
 
   return (
     <main className="page-product">
@@ -189,29 +459,11 @@ export default function Product({ product, initialReviews }) {
         <nav className="crumbs pp-crumbs">
           <button onClick={() => nav('home')}>{t('nav_home')}</button><Icon name="chevright" size={13} />
           <button onClick={() => nav('catalog', { cat: product.cat })}>{cat[lang]}</button><Icon name="chevright" size={13} />
+          {sub && (<><button onClick={() => nav('catalog', { cat: product.cat, sub: sub.id })}>{sub[lang] || sub.fr}</button><Icon name="chevright" size={13} /></>)}
           <span>{product.code}</span>
         </nav>
         <div className="pp-top">
-          <div className="pp-gallery">
-            <Reveal className="pp-stage">
-              <Badge kind={product.badge} />
-              <div className="pp-stage-img" key={activeShot}>
-                {gallery
-                  ? <img src={gallery[Math.min(activeShot, gallery.length - 1)]} alt={product.name} style={{ width: '100%', height: '100%', objectFit: 'contain', background: '#fff' }} />
-                  : <ProductImage product={product} size="hero" />}
-              </div>
-              <span className="pp-brand-chip" style={{ '--bc': brand.color }}>{brand.short}</span>
-            </Reveal>
-            {gallery && gallery.length > 1 && (
-              <div className="pp-thumbs">
-                {gallery.map((g, i) => (
-                  <button key={i} className={`pp-thumb ${activeShot === i ? 'on' : ''}`} onClick={() => setActiveShot(i)}>
-                    <img src={g} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain', background: '#fff' }} />
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
+          <Gallery product={product} brand={brand} />
           <div className="pp-info">
             <Reveal as="div" className="pp-info-head">
               <div className="pp-brand-row">
@@ -244,6 +496,7 @@ export default function Product({ product, initialReviews }) {
               <div className="pp-mini-actions">
                 <button className="pp-mini-btn" onClick={() => setFicheOpen(true)}><Icon name="pdf" size={15} /> {t('fiche_technique')}</button>
                 <button className="pp-mini-btn" onClick={() => nav('catalog', { cat: product.cat })}><Icon name="layers" size={15} /> {cat[lang]}</button>
+                {sub && <button className="pp-mini-btn" onClick={() => nav('catalog', { cat: product.cat, sub: sub.id })}><Icon name={sub.icon} size={15} /> {sub[lang] || sub.fr}</button>}
                 <button className="pp-mini-btn" aria-label={t('save')}><Icon name="heart" size={15} /> {t('save')}</button>
               </div>
             </Reveal>
@@ -290,8 +543,11 @@ export default function Product({ product, initialReviews }) {
         </div>
         {similar.length > 0 && (
           <section className="pp-similar">
-            <SectionHead kicker={cat[lang]} kickerIcon={cat.icon} title={t('similar')} />
-            <div className="prod-grid">{similar.map((p, i) => <ProductCard key={p.id} product={p} index={i} />)}</div>
+            <SectionHead kicker={cat[lang]} kickerIcon={cat.icon} title={t('similar')}
+              action={t('view_all')} onAction={() => nav('catalog', { cat: product.cat, ...(sub ? { sub: sub.id } : {}) })} />
+            <Rail label={t('similar')}>
+              {similar.map((p) => (<div className="rail-item" key={p.id}><ProductCard product={p} index={0} /></div>))}
+            </Rail>
           </section>
         )}
         <section className="pp-reviews" ref={reviewsRef}><ReviewSystem product={product} initialReviews={initialReviews} /></section>

@@ -14,6 +14,7 @@
       load_more: 'Voir plus de produits', showing_of: 'sur', back_to_top: 'Haut de page',
       sort_relevance: 'Pertinence', sort_rating: 'Mieux notés', sort_az: 'A → Z', sort_new: 'Nouveautés',
       all_categories: 'Toutes les catégories', all_brands: 'Toutes les marques', no_results: 'Aucun produit ne correspond.',
+      sub_type: 'Type de système', all_types: 'Tous les types',
       // hero
       hero_kicker: 'Sécurité · Réseaux · Affichage',
       hero_title: 'La sécurité intelligente, livrée et installée en Algérie.',
@@ -76,6 +77,7 @@
       load_more: 'Load more products', showing_of: 'of', back_to_top: 'Back to top',
       sort_relevance: 'Relevance', sort_rating: 'Top rated', sort_az: 'A → Z', sort_new: 'Newest',
       all_categories: 'All categories', all_brands: 'All brands', no_results: 'No products match your search.',
+      sub_type: 'System type', all_types: 'All types',
       hero_kicker: 'Security · Networks · Displays',
       hero_title: 'Smart security — delivered and installed across Algeria.',
       hero_sub: 'State-approved distributor for the import, distribution and installation of security equipment. Permanent stock, competitive pricing, pre- and after-sales support.',
@@ -131,6 +133,7 @@
       load_more: 'عرض المزيد من المنتجات', showing_of: 'من', back_to_top: 'العودة إلى الأعلى',
       sort_relevance: 'الصلة', sort_rating: 'الأعلى تقييماً', sort_az: 'أ → ي', sort_new: 'الأحدث',
       all_categories: 'كل الفئات', all_brands: 'كل العلامات', no_results: 'لا توجد منتجات مطابقة.',
+      sub_type: 'نوع النظام', all_types: 'كل الأنواع',
       hero_kicker: 'أمن · شبكات · شاشات',
       hero_title: 'أمن ذكي — يُسلَّم ويُركَّب في كامل الجزائر.',
       hero_sub: 'موزّع معتمد من الدولة لاستيراد وتوزيع وتركيب معدات الأمن. مخزون دائم، أسعار تنافسية، دعم قبل وبعد البيع.',

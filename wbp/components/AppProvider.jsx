@@ -111,7 +111,8 @@ export default function AppProvider({ catalog, settings = {}, ai = null, childre
     if (view === 'home') url = '/';
     else if (view === 'catalog') {
       const qs = new URLSearchParams();
-      ['cat', 'brand', 'q'].forEach((k) => { if (params[k]) qs.set(k, params[k]); });
+      // `sub` = sous-type d'une catégorie (ex. incendie → adressable / conventionnel)
+      ['cat', 'sub', 'brand', 'q'].forEach((k) => { if (params[k]) qs.set(k, params[k]); });
       url = '/catalog' + (qs.toString() ? `?${qs}` : '');
     } else if (view === 'product') url = '/product/' + encodeURIComponent(params.id);
     else url = '/' + view;
