@@ -24,6 +24,7 @@
       // sections
       sec_cat_kicker: 'Par catégorie', sec_cat_title: 'Trouvez votre solution', sec_cat_sub: "Un catalogue complet, du capteur à l'écran de supervision.",
       sec_best_kicker: 'Tendances', sec_best_title: 'Meilleures ventes', sec_best_sub: 'Les références plébiscitées par nos clients.',
+      sec_new_kicker: 'Nouveautés', sec_new_title: 'Nouveaux arrivages', sec_new_sub: 'Les dernières références entrées dans notre catalogue.',
       sec_brand_kicker: 'Confiance', sec_brand_title: 'Marques que nous distribuons', sec_brand_sub: 'Certifiés et recommandés par les plus grands fabricants.',
       sec_why_kicker: 'Pourquoi WBP', sec_why_title: "L'expertise sécurité, de bout en bout",
       why1_t: 'Organisme agréé', why1_d: "Agréé par l'État pour l'import, la distribution et l'installation.",
@@ -85,6 +86,7 @@
       stat_brands: 'Partner brands', stat_clients: 'Institutional clients', stat_years: 'Years of expertise', stat_products: 'References in stock',
       sec_cat_kicker: 'By category', sec_cat_title: 'Find your solution', sec_cat_sub: 'A complete catalog, from sensor to control room.',
       sec_best_kicker: 'Trending', sec_best_title: 'Best sellers', sec_best_sub: 'The references our customers love most.',
+      sec_new_kicker: 'New in', sec_new_title: 'New arrivals', sec_new_sub: 'The latest references added to our catalogue.',
       sec_brand_kicker: 'Trusted', sec_brand_title: 'Brands we distribute', sec_brand_sub: 'Certified and recommended by the world’s leading manufacturers.',
       sec_why_kicker: 'Why WBP', sec_why_title: 'End-to-end security expertise',
       why1_t: 'State-approved', why1_d: 'Approved for the import, distribution and installation of security gear.',
@@ -141,6 +143,7 @@
       stat_brands: 'علامات شريكة', stat_clients: 'عملاء مؤسسيون', stat_years: 'سنوات خبرة', stat_products: 'مرجع في المخزون',
       sec_cat_kicker: 'حسب الفئة', sec_cat_title: 'اعثر على حلّك', sec_cat_sub: 'كتالوج متكامل، من المستشعر إلى غرفة التحكم.',
       sec_best_kicker: 'الرائج', sec_best_title: 'الأكثر مبيعاً', sec_best_sub: 'المراجع المفضّلة لدى عملائنا.',
+      sec_new_kicker: 'جديد', sec_new_title: 'وصل حديثاً', sec_new_sub: 'أحدث المنتجات المضافة إلى كتالوجنا.',
       sec_brand_kicker: 'ثقة', sec_brand_title: 'العلامات التي نوزّعها', sec_brand_sub: 'معتمدون وموصى بهم من كبرى الشركات المصنّعة.',
       sec_why_kicker: 'لماذا WBP', sec_why_title: 'خبرة أمنية متكاملة',
       why1_t: 'معتمد من الدولة', why1_d: 'معتمد لاستيراد وتوزيع وتركيب معدات الأمن.',

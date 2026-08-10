@@ -33,6 +33,7 @@ if (!DATABASE_URL) {
 const SQL_FILES = [
   ['newsletter.sql', 'Newsletter & campagnes (pré-requis)'],
   ['upgrade.sql', 'Images, vitrine, pop-up, assistant IA'],
+  ['new-arrivals.sql', 'Nouveautés (nouveaux arrivages)'],
 ];
 
 async function run() {
@@ -50,6 +51,7 @@ async function run() {
     const b = await q('select count(*)::int total, count(logo_url)::int logos from brands');
     const c = await q('select count(*)::int total, count(image_url)::int imgs from categories');
     const v = await q("select count(*)::int n from featured_picks where site = 'wbp'");
+    const na = await q("select count(*)::int n from new_arrivals where site = 'wbp'");
     // Le schéma « storage » appartient parfois à un autre rôle : on ne fait pas
     // échouer le rapport si on n'a pas le droit de le lire.
     let bucket = null, bucketErr = null;
@@ -61,6 +63,7 @@ async function run() {
     console.log(`   Marques .......... ${b.total} (dont ${b.logos} avec logo)`);
     console.log(`   Catégories ....... ${c.total} (dont ${c.imgs} avec image)`);
     console.log(`   Vitrine .......... ${v.n} produit(s) sélectionné(s)`);
+    console.log(`   Nouveautés ....... ${na.n} produit(s) sélectionné(s)`);
     const bucketState = bucketErr ? 'non vérifiable depuis cette connexion'
       : bucket ? (bucket.public ? 'prêt (public)' : 'créé mais PRIVÉ — passez-le en public') : 'introuvable';
     console.log(`   Stockage « media » ${bucketState}`);
@@ -75,6 +78,7 @@ async function run() {
     console.log('   • Marques / Catégories → glissez un logo ou une image');
     console.log('   • Produits → photo principale + galerie');
     console.log('   • Vitrine → choisissez catégorie, marque et produits mis en avant');
+    console.log('   • Nouveautés → choisissez les produits des « Nouveaux arrivages »');
     console.log('   • Assistant IA → collez l\'URL de votre plateforme + la clé du widget');
   } finally {
     await client.end();

@@ -92,17 +92,15 @@ function CategoriesGrid() {
   );
 }
 
-function BestSellers() {
-  const { t, nav, wbp } = useApp();
-  // Vitrine choisie dans /admin/showcase, dans l'ordre exact défini par l'admin.
-  // Si elle est vide, on retombe sur les best-sellers puis sur le catalogue.
-  const items = wbp.showcase(8);
+/** Carrousel de produits réutilisable (meilleures ventes, nouveautés…). */
+function ProductCarousel({ className, kicker, kickerIcon, title, sub, items, onAction, actionLabel }) {
   const trackRef = useRef(null);
   const scroll = (dir) => { const el = trackRef.current; if (!el) return; el.scrollBy({ left: dir * (el.clientWidth * 0.8), behavior: 'smooth' }); };
+  if (!items.length) return null;
   return (
-    <section className="sec sec-best">
+    <section className={`sec ${className}`}>
       <div className="wrap">
-        <SectionHead kicker={t('sec_best_kicker')} kickerIcon="bolt" title={t('sec_best_title')} sub={t('sec_best_sub')} action={t('view_all')} onAction={() => nav('catalog')} />
+        <SectionHead kicker={kicker} kickerIcon={kickerIcon} title={title} sub={sub} action={actionLabel} onAction={onAction} />
         <div className="carousel">
           <button className="car-nav car-prev" onClick={() => scroll(-1)} aria-label="prev"><Icon name="chevleft" size={20} /></button>
           <div className="car-track" ref={trackRef}>
@@ -112,6 +110,34 @@ function BestSellers() {
         </div>
       </div>
     </section>
+  );
+}
+
+function BestSellers() {
+  const { t, nav, wbp } = useApp();
+  // Vitrine choisie dans /admin/showcase, dans l'ordre exact défini par l'admin.
+  // Si elle est vide, on retombe sur les best-sellers puis sur le catalogue.
+  return (
+    <ProductCarousel
+      className="sec-best" kicker={t('sec_best_kicker')} kickerIcon="bolt"
+      title={t('sec_best_title')} sub={t('sec_best_sub')}
+      items={wbp.showcase(8)}
+      actionLabel={t('view_all')} onAction={() => nav('catalog')}
+    />
+  );
+}
+
+function NewArrivals() {
+  const { t, nav, wbp } = useApp();
+  // Sélection faite dans /admin/arrivals. Si elle est vide, on retombe sur les
+  // produits marqués « Nouveau » dans leur fiche, puis sur les derniers ajoutés.
+  return (
+    <ProductCarousel
+      className="sec-new" kicker={t('sec_new_kicker')} kickerIcon="spark"
+      title={t('sec_new_title')} sub={t('sec_new_sub')}
+      items={wbp.newArrivals(8)}
+      actionLabel={t('view_all')} onAction={() => nav('catalog', { sort: 'new' })}
+    />
   );
 }
 
@@ -199,7 +225,7 @@ export function CTABand() {
 export default function Home() {
   return (
     <main className="page-home">
-      <Hero /><ClientStrip /><CategoriesGrid /><BestSellers /><BrandsShowcase /><WhyWBP /><NewsletterCTA /><CTABand />
+      <Hero /><ClientStrip /><CategoriesGrid /><BestSellers /><NewArrivals /><BrandsShowcase /><WhyWBP /><NewsletterCTA /><CTABand />
     </main>
   );
 }

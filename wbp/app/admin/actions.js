@@ -399,6 +399,36 @@ export async function removeFromShowcase(productId) {
 }
 
 // ============================================================================
+// NOUVEAUTÉS — « Nouveaux arrivages » sur la page d'accueil
+// ----------------------------------------------------------------------------
+// Liste séparée de la vitrine (table new_arrivals) : un produit peut donc être
+// à la fois « Meilleure vente » et « Nouveauté ». Sélection dans /admin/arrivals.
+// ============================================================================
+
+/** Remplace la liste des nouveautés par `productIds`, dans cet ordre. */
+export async function saveArrivals(productIds) {
+  await requireAdmin();
+  const sb = createAdminClient();
+  const ids = Array.from(new Set((Array.isArray(productIds) ? productIds : [])
+    .map((x) => s(x, 60)).filter(Boolean))).slice(0, 60);
+
+  const del = await sb.from('new_arrivals').delete().eq('site', SITE);
+  if (del.error) return { ok: false, error: friendly(del.error, 'Les nouveautés') };
+
+  if (ids.length) {
+    const rows = ids.map((product_id, i) => ({ site: SITE, product_id, rank: i }));
+    const { error } = await sb.from('new_arrivals').insert(rows);
+    if (error) return { ok: false, error: friendly(error, 'Les nouveautés') };
+  }
+
+  // On ne touche PAS au champ `badge` de la fiche produit : la pastille
+  // « Nouveau » reste un choix éditorial indépendant, et une liste vidée par
+  // erreur ne doit pas effacer ces badges (ils servent justement de repli).
+  revalidatePath('/admin/arrivals'); revalidatePath('/admin/products'); revalidatePath('/', 'layout');
+  return { ok: true, count: ids.length };
+}
+
+// ============================================================================
 // ASSISTANT IA — configuration (table privée ai_config, jamais exposée au client)
 // ============================================================================
 const AI_PROVIDERS = ['dtech', 'builtin', 'off'];

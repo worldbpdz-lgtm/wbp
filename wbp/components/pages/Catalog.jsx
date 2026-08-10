@@ -13,7 +13,9 @@ export default function Catalog() {
   const [brand, setBrand] = React.useState(route.params.brand || 'all');
   const [q, setQ] = React.useState(route.params.q || '');
   const [minRating, setMinRating] = React.useState(0);
-  const [sort, setSort] = React.useState('relevance');
+  // `?sort=` permet d'arriver depuis un lien déjà trié (ex. « Nouveaux arrivages »).
+  const SORTS = ['relevance', 'rating', 'az', 'new'];
+  const [sort, setSort] = React.useState(SORTS.includes(route.params.sort) ? route.params.sort : 'relevance');
   const [showFilters, setShowFilters] = React.useState(false);
   const PAGE = 24; // mobile-friendly page size for "load more" pagination
   const [visible, setVisible] = React.useState(PAGE);
@@ -21,7 +23,9 @@ export default function Catalog() {
   React.useEffect(() => {
     setCat(route.params.cat || 'all'); setSub(route.params.sub || 'all');
     setBrand(route.params.brand || 'all'); setQ(route.params.q || '');
-  }, [route.params.cat, route.params.sub, route.params.brand, route.params.q]);
+    if (SORTS.includes(route.params.sort)) setSort(route.params.sort);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [route.params.cat, route.params.sub, route.params.brand, route.params.q, route.params.sort]);
   // Reset the visible window whenever the result set changes (filter / search / sort).
   React.useEffect(() => { setVisible(PAGE); }, [cat, sub, brand, q, minRating, sort]);
 

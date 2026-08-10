@@ -19,9 +19,12 @@ function buildWbp(catalog) {
   // Vitrine (/admin/showcase) : ordre choisi par l'admin. rank 0 = tout devant.
   const picks = Array.isArray(catalog.picks) ? catalog.picks : [];
   const rank = new Map(picks.map((id, i) => [id, i]));
+  // Nouveautés (/admin/arrivals) : liste distincte de la vitrine, un produit
+  // peut donc être à la fois « Meilleure vente » et « Nouveauté ».
+  const arrivals = Array.isArray(catalog.arrivals) ? catalog.arrivals : [];
   return {
     brands, categories, products, clients, WHATSAPP,
-    picks,
+    picks, arrivals,
     /** Rang dans la vitrine (Infinity si le produit n'y est pas). */
     pickRank: (id) => (rank.has(id) ? rank.get(id) : Infinity),
     /**
@@ -43,6 +46,18 @@ function buildWbp(catalog) {
       if (chosen.length) return chosen.slice(0, limit);
       const best = products.filter((p) => p.badge === 'bestseller');
       return (best.length ? best : products).slice(0, limit);
+    },
+    /**
+     * Nouveaux arrivages, dans l'ordre choisi dans /admin/arrivals.
+     * Repli si la liste est vide : les produits marqués « Nouveau » dans la
+     * fiche produit, puis les derniers du catalogue — la section n'est
+     * jamais vide sur la page d'accueil.
+     */
+    newArrivals: (limit = 8) => {
+      const chosen = arrivals.map((id) => products.find((p) => p.id === id)).filter(Boolean);
+      if (chosen.length) return chosen.slice(0, limit);
+      const fresh = products.filter((p) => p.badge === 'new');
+      return (fresh.length ? fresh : [...products].reverse()).slice(0, limit);
     },
     brandById: (id) => brands.find((b) => b.id === id),
     categoryById: (id) => categories.find((c) => c.id === id),
@@ -112,7 +127,7 @@ export default function AppProvider({ catalog, settings = {}, ai = null, childre
     else if (view === 'catalog') {
       const qs = new URLSearchParams();
       // `sub` = sous-type d'une catégorie (ex. incendie → adressable / conventionnel)
-      ['cat', 'sub', 'brand', 'q'].forEach((k) => { if (params[k]) qs.set(k, params[k]); });
+      ['cat', 'sub', 'brand', 'q', 'sort'].forEach((k) => { if (params[k]) qs.set(k, params[k]); });
       url = '/catalog' + (qs.toString() ? `?${qs}` : '');
     } else if (view === 'product') url = '/product/' + encodeURIComponent(params.id);
     else url = '/' + view;

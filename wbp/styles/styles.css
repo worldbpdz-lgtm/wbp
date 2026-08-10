@@ -84,6 +84,8 @@ img{max-width:100%}
 
 /* ===== Section heading ===== */
 .sec{padding:clamp(54px,8vw,100px) 0}
+/* Nouveaux arrivages : léger fond pour distinguer les deux carrousels voisins. */
+.sec-new{background:var(--surface-2); border-block:1px solid var(--line-2)}
 .sec-head{display:flex; align-items:flex-end; justify-content:space-between; gap:24px; margin-bottom:38px; flex-wrap:wrap}
 .sec-title{font-size:clamp(21px,2.6vw,29px); font-weight:700}
 .sec-sub{color:var(--ink-2); font-size:clamp(14px,1.4vw,16px); margin-top:10px; max-width:46ch}

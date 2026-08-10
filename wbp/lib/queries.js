@@ -12,10 +12,10 @@ const mapProduct = (r) => ({
 
 // Whole catalog. Falls back to the bundled static catalog if Supabase is unset.
 export async function getCatalog() {
-  if (!hasSupabase()) return { ...fallbackCatalog, picks: [], source: 'fallback' };
+  if (!hasSupabase()) return { ...fallbackCatalog, picks: [], arrivals: [], source: 'fallback' };
   try {
     const sb = await createClient();
-    const [b, c, p, cl, fp] = await Promise.all([
+    const [b, c, p, cl, fp, na] = await Promise.all([
       sb.from('brands').select('*').order('sort'),
       sb.from('categories').select('*').order('sort'),
       sb.from('products').select('*').eq('active', true).order('sort'),
@@ -23,12 +23,16 @@ export async function getCatalog() {
       // Vitrine : ordre choisi dans /admin/showcase. La table peut ne pas
       // exister si la migration n'a pas encore été appliquée — on l'ignore.
       sb.from('featured_picks').select('product_id,rank').eq('site', SITE).order('rank'),
+      // Nouveautés : ordre choisi dans /admin/arrivals. Même remarque —
+      // requête séparée pour qu'une table absente ne casse jamais la vitrine.
+      sb.from('new_arrivals').select('product_id,rank').eq('site', SITE).order('rank'),
     ]);
     if (b.error || c.error || p.error) throw (b.error || c.error || p.error);
 
     const products = (p.data || []).map(mapProduct);
     const live = new Set(products.map((x) => x.id));
     const picks = fp.error ? [] : (fp.data || []).map((r) => r.product_id).filter((id) => live.has(id));
+    const arrivals = na.error ? [] : (na.data || []).map((r) => r.product_id).filter((id) => live.has(id));
 
     return {
       brands: (b.data || []).map(mapBrand),
@@ -36,13 +40,14 @@ export async function getCatalog() {
       products,
       clients: (cl.data || []).map((x) => x.name),
       picks,
+      arrivals,
       source: 'supabase',
     };
   } catch (e) {
     // Supabase IS configured but the query failed — show the real (empty) state
     // instead of the demo catalog, so the problem is visible rather than masked.
     console.error('getCatalog error:', e?.message);
-    return { brands: [], categories: [], products: [], clients: [], picks: [], source: 'error' };
+    return { brands: [], categories: [], products: [], clients: [], picks: [], arrivals: [], source: 'error' };
   }
 }
 

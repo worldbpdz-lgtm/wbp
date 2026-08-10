@@ -7,11 +7,41 @@
 // à droite la sélection ordonnée. On ajoute d'un clic, on réordonne avec les
 // flèches ou en glissant, on enregistre. L'ordre est celui du site public :
 // page d'accueil (« Meilleures ventes ») et haut du catalogue.
+//
+// Le même écran sert à deux listes distinctes : la VITRINE (« Meilleures
+// ventes ») et les NOUVEAUTÉS (« Nouveaux arrivages »). On passe simplement
+// l'action d'enregistrement et les libellés via les props `list`.
 // ============================================================================
 import React, { useState, useMemo, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { saveShowcase } from '@/app/admin/actions';
+import { saveShowcase, saveArrivals } from '@/app/admin/actions';
 import { Icon } from '@/components/primitives';
+
+// Les deux listes gérées par cet écran.
+const LISTS = {
+  showcase: {
+    save: saveShowcase,
+    noun: 'Vitrine',
+    addTitle: 'Ajouter à la vitrine',
+    pickedTitle: 'Affichés en premier',
+    emptyTitle: 'Vitrine vide',
+    emptyHelp: 'Cliquez sur un produit à gauche pour le faire apparaître en premier sur le site.',
+    savedText: (n) => `Vitrine enregistrée — ${n} produit(s) mis en avant.`,
+    saveBtn: 'Enregistrer la vitrine',
+    cleanText: 'Vitrine à jour',
+  },
+  arrivals: {
+    save: saveArrivals,
+    noun: 'Nouveautés',
+    addTitle: 'Ajouter aux nouveautés',
+    pickedTitle: 'Nouveaux arrivages',
+    emptyTitle: 'Aucune nouveauté sélectionnée',
+    emptyHelp: 'Cliquez sur un produit à gauche pour l’afficher dans « Nouveaux arrivages » sur l’accueil. Tant que la liste est vide, le site affiche les produits marqués « Nouveau » dans leur fiche.',
+    savedText: (n) => `Nouveautés enregistrées — ${n} produit(s) affiché(s).`,
+    saveBtn: 'Enregistrer les nouveautés',
+    cleanText: 'Nouveautés à jour',
+  },
+};
 
 function Thumb({ p }) {
   if (p.image_url) {
@@ -21,7 +51,8 @@ function Thumb({ p }) {
   return <span className="shw-thumb shw-thumb-ph"><Icon name="box" size={16} /></span>;
 }
 
-export default function ShowcaseManager({ products = [], brands = [], categories = [], initial = [] }) {
+export default function ShowcaseManager({ products = [], brands = [], categories = [], initial = [], list = 'showcase' }) {
+  const L = LISTS[list] || LISTS.showcase;
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [picked, setPicked] = useState(initial);
@@ -67,8 +98,8 @@ export default function ShowcaseManager({ products = [], brands = [], categories
   const save = () => {
     setMsg(null);
     startTransition(async () => {
-      const res = await saveShowcase(picked);
-      if (res?.ok) { setMsg({ kind: 'ok', text: `Vitrine enregistrée — ${res.count} produit(s) mis en avant.` }); router.refresh(); }
+      const res = await L.save(picked);
+      if (res?.ok) { setMsg({ kind: 'ok', text: L.savedText(res.count) }); router.refresh(); }
       else setMsg({ kind: 'err', text: res?.error || 'Enregistrement impossible.' });
     });
   };
@@ -124,7 +155,7 @@ export default function ShowcaseManager({ products = [], brands = [], categories
             {available.length === 0 ? (
               <div className="adm-empty">Aucun produit disponible avec ces filtres.</div>
             ) : available.map((p) => (
-              <button type="button" key={p.id} className="shw-row" onClick={() => add(p.id)} title="Ajouter à la vitrine">
+              <button type="button" key={p.id} className="shw-row" onClick={() => add(p.id)} title={L.addTitle}>
                 <Thumb p={p} />
                 <span className="shw-row-txt">
                   <b>{p.name}</b>
@@ -138,14 +169,14 @@ export default function ShowcaseManager({ products = [], brands = [], categories
 
         <div className="adm-panel shw-col shw-col-picked">
           <div className="adm-panel-hd">
-            <h2>Affichés en premier <span className="adm-count on">{picked.length}</span></h2>
+            <h2>{L.pickedTitle} <span className="adm-count on">{picked.length}</span></h2>
             {picked.length > 0 && <button type="button" className="adm-btn sm danger" onClick={() => setPicked([])}>Tout vider</button>}
           </div>
           <div className="shw-list">
             {picked.length === 0 ? (
               <div className="adm-empty">
-                <b>Vitrine vide</b>
-                <p>Cliquez sur un produit à gauche pour le faire apparaître en premier sur le site.</p>
+                <b>{L.emptyTitle}</b>
+                <p>{L.emptyHelp}</p>
               </div>
             ) : picked.map((id, i) => {
               const p = byId[id];
@@ -174,13 +205,13 @@ export default function ShowcaseManager({ products = [], brands = [], categories
       {/* ---- Barre d'enregistrement ---- */}
       <div className={`shw-save ${dirty ? 'dirty' : ''}`}>
         <span className="shw-save-txt">
-          {dirty ? 'Modifications non enregistrées' : 'Vitrine à jour'}
+          {dirty ? 'Modifications non enregistrées' : L.cleanText}
           {msg && <em className={`adm-flash ${msg.kind}`}>{msg.text}</em>}
         </span>
         <div className="adm-actions">
           {dirty && <button type="button" className="adm-btn" onClick={() => { setPicked(initial); setMsg(null); }}>Annuler</button>}
           <button type="button" className="adm-btn primary" onClick={save} disabled={pending || !dirty}>
-            {pending ? 'Enregistrement…' : 'Enregistrer la vitrine'}
+            {pending ? 'Enregistrement…' : L.saveBtn}
           </button>
         </div>
       </div>
