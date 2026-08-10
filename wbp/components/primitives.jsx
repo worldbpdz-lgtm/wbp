@@ -126,9 +126,8 @@ export function ProductImage({ product, size = 'card' }) {
   const big = size === 'hero';
   if (product.image_url) {
     return (
-      <div className="prod-img" style={{ '--tint': tint }}>
-        <img src={product.image_url} alt={product.name} loading="lazy"
-          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+      <div className={`prod-img prod-img-photo ${big ? 'prod-img-hero' : ''}`} style={{ '--tint': tint }}>
+        <img src={product.image_url} alt={product.name} loading="lazy" />
       </div>
     );
   }

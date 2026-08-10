@@ -93,6 +93,12 @@ img{max-width:100%}
   background:
     radial-gradient(120% 100% at 50% 0%, color-mix(in oklab,var(--tint) 9%,var(--surface)) 0%, var(--surface) 60%);
   display:flex; align-items:center; justify-content:center}
+/* Real product photos: never crop — fit the whole shot inside the box with breathing room */
+.prod-img-photo{background:#fff; padding:9% 10%}
+.prod-img-photo img{width:100%; height:100%; object-fit:contain; object-position:center; display:block}
+.prod-img-photo.prod-img-hero{padding:6% 7%}
+:root[data-theme="dark"] .prod-img-photo,
+[data-theme="dark"] .prod-img-photo{background:#f4f5f7}
 .prod-img-grid{position:absolute; inset:0;
   background-image:linear-gradient(var(--line-2) 1px,transparent 1px),linear-gradient(90deg,var(--line-2) 1px,transparent 1px);
   background-size:26px 26px; mask:radial-gradient(80% 70% at 50% 45%,#000,transparent 78%); opacity:.7}
