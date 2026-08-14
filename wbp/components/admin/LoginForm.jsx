@@ -132,7 +132,9 @@ export default function LoginForm() {
   return (
     <form className="lg-card" onSubmit={submit} noValidate>
       <div className="lg-card-head">
-        <span className="lg-mark" aria-hidden="true">W</span>
+        {/* Carte blanche → variante sombre du logo (/logos/wbp1.png). */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <span className="lg-mark" aria-hidden="true"><img src="/logos/wbp1.png" alt="" width={46} height={46} /></span>
         <div>
           <h1>{title}</h1>
           <p>{sub}</p>

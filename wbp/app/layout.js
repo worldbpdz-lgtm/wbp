@@ -8,7 +8,15 @@ export const metadata = {
   },
   description:
     "World Business Plus (WBP) — Distributeur agréé en Algérie. Vidéosurveillance, alarme, contrôle d'accès, affichage MAXHUB, réseau & stockage. Prix sur devis.",
-  icons: { icon: '/favicon.svg' },
+  // Logo WBP (globe) sur fond blanc : lisible dans un onglet clair comme sombre.
+  icons: {
+    icon: [
+      { url: '/icon-32.png', sizes: '32x32', type: 'image/png' },
+      { url: '/icon-192.png', sizes: '192x192', type: 'image/png' },
+      { url: '/icon-512.png', sizes: '512x512', type: 'image/png' },
+    ],
+    apple: [{ url: '/apple-icon.png', sizes: '180x180', type: 'image/png' }],
+  },
 };
 
 export const viewport = { themeColor: '#FF5A1F' };

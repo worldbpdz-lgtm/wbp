@@ -21,8 +21,10 @@
 .adm-side{position:sticky;top:0;height:100vh;background:linear-gradient(180deg,var(--side-1),var(--side-2));
   color:#f3ece2;padding:22px 16px;display:flex;flex-direction:column;gap:3px;overflow:auto}
 .adm-brand{display:flex;align-items:center;gap:12px;padding:6px 8px 22px;font-family:var(--font-display);font-weight:700;font-size:16px;letter-spacing:-.01em}
-.adm-brand .m{width:40px;height:40px;border-radius:13px;background:linear-gradient(135deg,#FF7A45,var(--accent));
-  display:grid;place-items:center;font-size:20px;color:#fff;box-shadow:0 10px 22px -8px var(--accent-glow)}
+/* Porte-logo : le logo apporte déjà l'orange, on retire donc la pastille
+   dégradée qui servait de repli quand il n'y avait qu'un « W ». */
+.adm-brand .m{flex:0 0 auto;width:40px;height:40px;display:grid;place-items:center}
+.adm-brand .m img{width:100%;height:100%;object-fit:contain;display:block}
 .adm-brand small{display:block;font-weight:500;font-size:11px;opacity:.6;letter-spacing:.06em;text-transform:uppercase;margin-top:2px}
 .adm-navlabel{font-size:10px;text-transform:uppercase;letter-spacing:.14em;opacity:.45;margin:16px 12px 5px;font-weight:700}
 .adm-navlink{display:flex;align-items:center;gap:12px;padding:10px 13px;border-radius:12px;color:rgba(243,236,226,.78);
@@ -187,18 +189,82 @@ select.adm-tag{border:none;cursor:pointer;-webkit-appearance:none;appearance:non
 /* ---- panneau de marque ---- */
 .lg-aside{position:relative;overflow:hidden;display:flex;align-items:center;
   background:linear-gradient(160deg,#2f231c 0%,#1a1210 58%,#140e0c 100%);color:#f6efe6}
+/* Halo orange : dérive lente et « respiration ». Une seule couche animée en
+   transform/opacity — composité par le GPU, aucun repaint. */
 .lg-aside-glow{position:absolute;inset:-30% -10% auto -20%;height:80%;pointer-events:none;
-  background:radial-gradient(closest-side,rgba(255,122,69,.42),transparent 72%);filter:blur(6px)}
+  background:radial-gradient(closest-side,rgba(255,122,69,.42),transparent 72%);filter:blur(6px);
+  will-change:transform,opacity;animation:lgGlow 22s cubic-bezier(.45,0,.55,1) infinite alternate}
+@keyframes lgGlow{
+  0%  {transform:translate3d(0,0,0)     scale(1);    opacity:.82}
+  50% {transform:translate3d(7%,5%,0)   scale(1.14); opacity:1}
+  100%{transform:translate3d(-5%,9%,0)  scale(1.05); opacity:.78}
+}
+/* ---- fond animé : balayage radar ------------------------------------------
+   Toutes les couches sont décoratives et non interactives. Le faisceau tourne
+   en `rotate` seul, les ondes en `scale`/`opacity` : rien qui déclenche un
+   recalcul de mise en page. Le quadrillage (.lg-aside::after) repasse par-
+   dessus et donne l'impression d'un écran de contrôle. */
+.lg-radar{position:absolute;top:50%;left:32%;transform:translate(-50%,-50%);
+  width:min(150%,860px);aspect-ratio:1;pointer-events:none;z-index:0;opacity:.5;
+  -webkit-mask-image:radial-gradient(closest-side,#000 42%,rgba(0,0,0,.35) 72%,transparent 100%);
+          mask-image:radial-gradient(closest-side,#000 42%,rgba(0,0,0,.35) 72%,transparent 100%)}
+
+/* le faisceau */
+.lg-radar::before{content:"";position:absolute;inset:0;border-radius:50%;
+  background:conic-gradient(from 0deg,
+    rgba(255,122,69,.34) 0deg,
+    rgba(255,122,69,.12) 16deg,
+    rgba(255,122,69,0)   48deg,
+    rgba(255,122,69,0)   360deg);
+  animation:lgSweep 9s linear infinite;will-change:transform}
+@keyframes lgSweep{to{transform:rotate(360deg)}}
+
+/* cercles de portée + axes, fixes */
+.lg-radar-rings{position:absolute;inset:0;border-radius:50%;
+  background:
+    repeating-radial-gradient(circle at 50% 50%,transparent 0 68px,rgba(255,255,255,.06) 68px 69px),
+    linear-gradient(rgba(255,255,255,.045),rgba(255,255,255,.045)) 50% 0/1px 100% no-repeat,
+    linear-gradient(rgba(255,255,255,.045),rgba(255,255,255,.045)) 0 50%/100% 1px no-repeat}
+
+/* ondes qui s'éloignent, décalées dans le temps */
+.lg-radar-ping{position:absolute;inset:0;border-radius:50%;
+  border:1px solid rgba(255,122,69,.4);animation:lgPing 9s cubic-bezier(.2,.6,.3,1) infinite;will-change:transform,opacity}
+.lg-radar-ping.p2{animation-delay:4.5s}
+@keyframes lgPing{
+  0%  {transform:scale(.10);opacity:0}
+  10% {opacity:.5}
+  75% {opacity:0}
+  100%{transform:scale(1);opacity:0}
+}
+
+/* Échos : deux points qui s'allument au passage du faisceau. Placés au-dessus
+   du logo et sous la mention légale — jamais à hauteur des puces de la liste,
+   où ils se confondraient avec elles. Le décalage de chaque écho correspond à
+   son angle (delay = 9s × angle / 360°), il s'allume donc pile au passage. */
+.lg-radar-blip{position:absolute;width:6px;height:6px;border-radius:50%;
+  background:rgba(255,154,107,.95);box-shadow:0 0 11px 3px rgba(255,122,69,.5);
+  opacity:0;animation:lgBlip 9s linear infinite}
+.lg-radar-blip.b1{left:62%;top:15%;animation-delay:.47s}   /* ~19°  */
+.lg-radar-blip.b2{left:41%;top:82%;animation-delay:4.89s}  /* ~196° */
+@keyframes lgBlip{
+  0%       {opacity:0;  transform:scale(.5)}
+  2%       {opacity:.8; transform:scale(1)}
+  20%      {opacity:0;  transform:scale(.85)}
+  100%     {opacity:0;  transform:scale(.5)}
+}
+
 .lg-aside::after{content:"";position:absolute;inset:0;pointer-events:none;opacity:.35;
   background-image:linear-gradient(rgba(255,255,255,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.05) 1px,transparent 1px);
   background-size:46px 46px;mask-image:radial-gradient(70% 60% at 30% 40%,#000,transparent)}
-.lg-aside-inner{position:relative;z-index:1;padding:clamp(36px,5vw,72px);max-width:560px;margin-inline-start:auto;width:100%}
-.lg-aside-brand{display:flex;align-items:center;gap:14px;margin-bottom:clamp(28px,6vh,54px)}
+/* Bloc centré dans le panneau (et non collé au bord droit), rythme vertical
+   resserré : logo → titre → arguments → mention se lisent comme un seul bloc. */
+.lg-aside-inner{position:relative;z-index:1;padding:clamp(32px,4.5vw,56px);max-width:540px;margin-inline:auto;width:100%}
+.lg-aside-brand{display:flex;align-items:center;gap:14px;margin-bottom:clamp(24px,4vh,40px)}
 .lg-aside-brand b{display:block;font-family:var(--font-display);font-size:16px;font-weight:700;letter-spacing:-.01em}
 .lg-aside-brand small{display:block;font-size:11px;letter-spacing:.12em;text-transform:uppercase;opacity:.55;margin-top:3px}
 .lg-aside-title{font-family:var(--font-display);font-size:clamp(26px,2.7vw,38px);line-height:1.14;letter-spacing:-.03em;
-  font-weight:700;margin:0 0 30px;max-width:14ch}
-.lg-perks{list-style:none;margin:0 0 clamp(28px,6vh,52px);padding:0;display:flex;flex-direction:column;gap:17px}
+  font-weight:700;margin:0 0 26px;max-width:15ch}
+.lg-perks{list-style:none;margin:0 0 clamp(24px,4vh,38px);padding:0;display:flex;flex-direction:column;gap:15px}
 .lg-perks li{display:flex;gap:13px;align-items:flex-start}
 .lg-perk-dot{flex:0 0 auto;width:9px;height:9px;margin-top:6px;border-radius:50%;
   background:linear-gradient(135deg,#FF9A6B,var(--accent));box-shadow:0 0 0 4px rgba(255,90,31,.16)}
@@ -206,17 +272,50 @@ select.adm-tag{border:none;cursor:pointer;-webkit-appearance:none;appearance:non
 .lg-perks i{display:block;font-style:normal;font-size:13px;line-height:1.55;opacity:.6;margin-top:2px}
 .lg-aside-foot{font-size:12px;opacity:.45;margin:0}
 
+/* ---- apparition en cascade du panneau de marque ----------------------------
+   Chaque bloc monte et se révèle l'un après l'autre au chargement. Les deux
+   images clés finales conservent l'opacité de repos de l'élément (la mention
+   du bas reste à .45), sinon `animation-fill-mode:both` l'écraserait. */
+@keyframes lgRise     {from{opacity:0;  transform:translateY(18px)}to{opacity:1;  transform:none}}
+@keyframes lgRiseFoot {from{opacity:0;  transform:translateY(18px)}to{opacity:.45;transform:none}}
+.lg-aside-brand,
+.lg-aside-title,
+.lg-perks li,
+.lg-aside-foot{animation:lgRise .72s cubic-bezier(.22,1,.36,1) both}
+.lg-aside-brand   {animation-delay:.06s}
+.lg-aside-title   {animation-delay:.16s}
+.lg-perks li:nth-child(1){animation-delay:.30s}
+.lg-perks li:nth-child(2){animation-delay:.39s}
+.lg-perks li:nth-child(3){animation-delay:.48s}
+.lg-perks li:nth-child(4){animation-delay:.57s}
+.lg-aside-foot    {animation-name:lgRiseFoot;animation-delay:.68s}
+/* La pastille orange s'allume juste après son texte. */
+.lg-perk-dot{animation:lgDot .5s ease-out both;animation-delay:inherit}
+@keyframes lgDot{from{transform:scale(.2);box-shadow:0 0 0 0 rgba(255,90,31,0)}
+                 to  {transform:scale(1); box-shadow:0 0 0 4px rgba(255,90,31,.16)}}
+
 /* ---- colonne formulaire ---- */
 .lg-main{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;padding:clamp(24px,5vw,56px) 20px}
 .lg-card{width:100%;max-width:412px;background:#fff;border:1px solid var(--line-2);border-radius:22px;
   padding:clamp(26px,3.4vw,34px);box-shadow:var(--shadow-lg);animation:lgIn .45s cubic-bezier(.22,1,.36,1) both}
 @keyframes lgIn{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
-@media(prefers-reduced-motion:reduce){.lg-card{animation:none}}
+/* Accessibilité : aucun mouvement si le système le demande. On neutralise
+   l'animation ET on restitue l'état de repos (opacités d'origine). */
+@media(prefers-reduced-motion:reduce){
+  .lg-card,.lg-aside-glow,.lg-aside-brand,.lg-aside-title,.lg-perks li,.lg-perk-dot{animation:none}
+  .lg-aside-brand,.lg-aside-title,.lg-perks li{opacity:1;transform:none}
+  .lg-aside-foot{animation:none;opacity:.45;transform:none}
+  /* Le radar reste, mais figé : cercles et faisceau immobiles, pas d'échos. */
+  .lg-radar::before,.lg-radar-ping,.lg-radar-blip{animation:none}
+  .lg-radar-ping{transform:scale(.62);opacity:.22}
+  .lg-radar-ping.p2{transform:scale(.9);opacity:.12}
+  .lg-radar-blip{opacity:.5}
+}
 
-.lg-mark{flex:0 0 auto;width:46px;height:46px;border-radius:15px;background:linear-gradient(135deg,#FF7A45,var(--accent));
-  display:grid;place-items:center;color:#fff;font-family:var(--font-display);font-weight:700;font-size:23px;
-  box-shadow:0 14px 26px -12px var(--accent-glow)}
-.lg-mark-lg{width:52px;height:52px;border-radius:17px;font-size:26px}
+/* Porte-logo (carte de connexion + panneau de marque). */
+.lg-mark{flex:0 0 auto;width:46px;height:46px;display:grid;place-items:center}
+.lg-mark img{width:100%;height:100%;object-fit:contain;display:block}
+.lg-mark-lg{width:52px;height:52px}
 .lg-card-head{display:flex;align-items:center;gap:14px;margin-bottom:20px}
 .lg-card-head h1{font-family:var(--font-display);font-size:21px;font-weight:700;margin:0;letter-spacing:-.025em}
 .lg-card-head p{color:var(--ink-2);margin:3px 0 0;font-size:13px;line-height:1.45}

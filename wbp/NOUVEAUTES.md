@@ -78,6 +78,73 @@ les derniers produits du catalogue. Enregistrer une liste vide ne supprime
 aucun badge — la pastille « Nouveau » de la fiche produit reste un réglage
 indépendant.
 
+## Logo dans l'espace d'administration
+
+Le « W » orange qui servait de logo provisoire a été remplacé par le vrai logo
+World Business Plus, dans la variante adaptée au fond :
+
+| Emplacement | Fond | Fichier |
+|---|---|---|
+| Barre latérale de l'admin | sombre | `/logos/wbp.png` |
+| Page de connexion — panneau de gauche | sombre | `/logos/wbp.png` |
+| Page de connexion — carte du formulaire | blanc | `/logos/wbp1.png` |
+| Onglet du navigateur / écran d'accueil mobile | blanc | `icon-32/192/512.png`, `apple-icon.png` |
+
+Fichiers modifiés : `components/AdminNav.jsx`, `components/admin/LoginForm.jsx`,
+`app/admin/login/page.js`, `app/admin/admin.css`, `app/layout.js`.
+
+**Au passage :** `logos/wbp1.png` pesait **1,1 Mo** (1024 × 1024) pour un logo
+affiché à 40 px — il était chargé sur *chaque* page du site public. Il est
+maintenant en 512 px optimisé : **15 ko**, soit 70× plus léger, à l'œil
+identique. `wbp.png` passe de 67 ko à 9 ko.
+
+L'ancien `public/favicon.svg` (le « W » orange) n'est plus référencé ; il reste
+dans le dossier si vous souhaitez revenir en arrière.
+
+### Panneau de gauche de la page de connexion
+
+**Positionnement.** Le bloc était collé au bord droit du panneau
+(`max-width:560px` + `margin-inline-start:auto`), d'où le grand vide à gauche.
+Il est maintenant **centré** (`margin-inline:auto`, 540 px), et le rythme
+vertical est resserré — logo, titre, arguments et mention légale se lisent
+comme un seul groupe au lieu de flotter séparément.
+
+**Fond animé — balayage radar.** Clin d'œil au métier : le panneau se comporte
+comme un écran de contrôle. Quatre couches, 100 % CSS, aucune image, aucun
+script :
+
+1. **Faisceau** — un dégradé conique tourne en 9 s, linéaire, sans à-coup.
+2. **Cercles de portée + axes** — fixes, très discrets, sous le faisceau.
+3. **Ondes** — deux cercles s'écartent du centre et s'effacent, décalés de 4,5 s.
+4. **Échos** — deux points orange qui s'allument *pile au passage du faisceau*
+   (le décalage de chaque écho vaut `9 s × angle / 360°`). Ils sont placés
+   au-dessus du logo et sous la mention légale, jamais à hauteur des puces de
+   la liste où on les confondrait avec elles.
+
+Le tout est masqué en dégradé sur les bords, passe **sous** le quadrillage
+existant — ce qui donne l'effet « écran » — et sous le texte (`z-index`).
+Seuls `transform` et `opacity` sont animés : c'est le GPU qui travaille, la
+mise en page n'est jamais recalculée.
+
+Réglages rapides : `.lg-radar { opacity }` pour l'intensité globale,
+la durée `9s` de `lgSweep` pour la vitesse (pensez à reporter la même durée sur
+`lgPing` et `lgBlip`, et à recalculer les délais des échos).
+
+**Animation du texte.** Deux effets, tout en `transform`/`opacity` :
+
+- *Apparition en cascade* — logo (60 ms), titre (160 ms), puis chaque argument
+  (300 / 390 / 480 ms) et la mention du bas (680 ms) montent et se révèlent
+  l'un après l'autre. La pastille orange de chaque argument éclot en même temps
+  que son texte (`animation-delay:inherit`).
+- *Halo vivant* — le dégradé orange dérive et « respire » sur un cycle de 22 s,
+  en aller-retour, sans jamais boucler brutalement.
+
+Tout est désactivé si le système demande moins d'animations
+(`prefers-reduced-motion`), en restituant les opacités de repos.
+
+Réglages dans `app/admin/admin.css`, section « panneau de marque » :
+`lgRise` / `lgRiseFoot` / `lgDot` pour la cascade, `lgGlow` pour le halo.
+
 ## Mise en ligne
 
 Tout ceci est **local** : à déployer, puis lancer la migration une fois.

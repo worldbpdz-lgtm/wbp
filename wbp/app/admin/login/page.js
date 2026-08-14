@@ -18,9 +18,21 @@ export default function AdminLoginPage() {
           toute la place au formulaire sur mobile. */}
       <aside className="lg-aside" aria-hidden="true">
         <div className="lg-aside-glow" />
+        {/* Fond animé : balayage radar (clin d'œil au métier de la vidéo-
+            surveillance). Décoratif, 100 % CSS, désactivé si l'utilisateur
+            demande moins d'animations. */}
+        <div className="lg-radar">
+          <span className="lg-radar-rings" />
+          <span className="lg-radar-ping" />
+          <span className="lg-radar-ping p2" />
+          <span className="lg-radar-blip b1" />
+          <span className="lg-radar-blip b2" />
+        </div>
         <div className="lg-aside-inner">
           <div className="lg-aside-brand">
-            <span className="lg-mark lg-mark-lg">W</span>
+            {/* Panneau sombre → variante claire du logo. */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <span className="lg-mark lg-mark-lg"><img src="/logos/wbp.png" alt="" width={52} height={52} /></span>
             <div>
               <b>World Business Plus</b>
               <small>Espace d’administration</small>
@@ -43,7 +55,9 @@ export default function AdminLoginPage() {
         <Suspense fallback={(
           <div className="lg-card lg-card-skeleton">
             <div className="lg-card-head">
-              <span className="lg-mark" aria-hidden="true">W</span>
+              {/* Carte blanche → variante sombre du logo. */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <span className="lg-mark" aria-hidden="true"><img src="/logos/wbp1.png" alt="" width={46} height={46} /></span>
               <div><h1>Connexion</h1><p>Chargement…</p></div>
             </div>
             <div className="lg-skel" /><div className="lg-skel" /><div className="lg-skel btn" />

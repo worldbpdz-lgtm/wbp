@@ -17,7 +17,12 @@ export default function AdminNav({ counts = {}, email }) {
   const pathname = usePathname();
   return (
     <aside className="adm-side">
-      <div className="adm-brand"><span className="m">W</span><span>World Business Plus<small>Administration</small></span></div>
+      <div className="adm-brand">
+        {/* Barre latérale sombre → variante claire du logo (/logos/wbp.png). */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <span className="m"><img src="/logos/wbp.png" alt="World Business Plus" width={40} height={40} /></span>
+        <span>World Business Plus<small>Administration</small></span>
+      </div>
       {GROUPS.map((g, gi) => (
         <React.Fragment key={gi}>
           {g.label && <div className="adm-navlabel">{g.label}</div>}
