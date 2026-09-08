@@ -1,14 +1,53 @@
 import { createClient, createAdminClient, hasSupabase } from '@/lib/supabase/server';
 import { fallbackCatalog } from '@/lib/fallback-catalog';
+import { PRODUCT_IMAGES } from '@/lib/product-images.generated';
 import { SITE } from '@/lib/site';
 
 const mapBrand = (r) => ({ id: r.id, name: r.name, short: r.short || r.name, color: r.color, logo_url: r.logo_url || null, desc: r.description || {} });
 const mapCategory = (r) => ({ id: r.id, icon: r.icon, image_url: r.image_url || null, fr: r.name?.fr, en: r.name?.en, ar: r.name?.ar, blurb: r.blurb || {} });
-const mapProduct = (r) => ({
-  id: r.id, cat: r.cat, brand: r.brand, name: r.name, code: r.code, badge: r.badge,
-  rating: Number(r.rating) || 0, reviews: r.reviews_count || 0, featured: !!r.featured,
-  tag: r.tag || {}, specs: r.specs || [], image_url: r.image_url || null, price: r.price ?? null, images: Array.isArray(r.images) ? r.images : [],
-});
+
+// ----------------------------------------------------------------------------
+// Photos : 420 fichiers sont livrés dans public/products (nommés d'après
+// l'identifiant produit) mais seule une quarantaine de lignes avait un
+// products.image_url renseigné — d'où « les images ne s'affichent que sur
+// quelques produits ». On complète donc ce qui vient de la base avec les
+// fichiers réellement présents dans le dépôt (manifeste généré au build).
+// La base reste maîtresse : une valeur saisie dans /admin gagne toujours.
+// ----------------------------------------------------------------------------
+function withLocalImages(r) {
+  const local = PRODUCT_IMAGES[r.id] || [];
+  const fromDb = Array.isArray(r.images) ? r.images.filter(Boolean) : [];
+  const images = Array.from(new Set([...fromDb, ...local]));
+  return { image_url: r.image_url || images[0] || null, images };
+}
+
+const mapProduct = (r) => {
+  const { image_url, images } = withLocalImages(r);
+  return {
+    id: r.id, cat: r.cat, brand: r.brand, name: r.name, code: r.code, badge: r.badge,
+    rating: Number(r.rating) || 0, reviews: r.reviews_count || 0, featured: !!r.featured,
+    tag: r.tag || {}, specs: r.specs || [], image_url, price: r.price ?? null, images,
+  };
+};
+
+// ----------------------------------------------------------------------------
+// PostgREST plafonne chaque réponse à 1000 lignes (db-max-rows). Un
+// `select('*')` sans pagination tronque donc silencieusement le catalogue dès
+// le 1001ᵉ produit — le site n'en affiche jamais plus, sans le moindre message.
+// On pagine explicitement pour que le catalogue reste complet quelle que soit
+// sa taille.
+// ----------------------------------------------------------------------------
+const PAGE_ROWS = 1000;
+export async function selectAll(build, { pageSize = PAGE_ROWS, max = 50000 } = {}) {
+  const out = [];
+  for (let from = 0; from < max; from += pageSize) {
+    const { data, error } = await build().range(from, from + pageSize - 1);
+    if (error) return { data: out, error };
+    out.push(...(data || []));
+    if (!data || data.length < pageSize) break;
+  }
+  return { data: out, error: null };
+}
 
 // Whole catalog. Falls back to the bundled static catalog if Supabase is unset.
 export async function getCatalog() {
@@ -18,7 +57,8 @@ export async function getCatalog() {
     const [b, c, p, cl, fp, na] = await Promise.all([
       sb.from('brands').select('*').order('sort'),
       sb.from('categories').select('*').order('sort'),
-      sb.from('products').select('*').eq('active', true).order('sort'),
+      // Paginé : au-delà de 1000 produits, un select simple s'arrêterait là.
+      selectAll(() => sb.from('products').select('*').eq('active', true).order('sort').order('id')),
       sb.from('clients').select('name').eq('site', SITE).order('sort'),
       // Vitrine : ordre choisi dans /admin/showcase. La table peut ne pas
       // exister si la migration n'a pas encore été appliquée — on l'ignore.
@@ -131,6 +171,8 @@ export async function getSettings() {
 // ai_config est une table PRIVÉE (RLS sans policy) : elle n'est lisible qu'avec
 // la clé service_role, côté serveur. getAiPublic() renvoie uniquement ce que le
 // navigateur a besoin de connaître — jamais l'URL de la plateforme ni la clé.
+// Aucun fournisseur n'est nommé : 'builtin' = réponses issues du catalogue,
+// toute autre valeur = plateforme externe choisie par l'administrateur.
 // ============================================================================
 export const AI_DEFAULTS = {
   enabled: true,
@@ -181,6 +223,6 @@ export async function getAiPublic() {
     greeting: c.greeting,
     suggestions: c.suggestions,
     accent: c.accent,
-    live: c.provider === 'dtech' && !!c.base_url && !!c.widget_key,
+    live: c.provider !== 'builtin' && !!c.base_url && !!c.widget_key,
   };
 }

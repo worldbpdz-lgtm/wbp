@@ -46,6 +46,9 @@ export default function ProductEditor({ product, brands, categories, isNew }) {
     try {
       const res = await upsertProduct({ ...f, id: f.id || slugify(f.name), specs, images });
       if (!res?.ok) { setErr(res?.error || 'Erreur'); return; }
+      // Enregistré, mais une colonne manquait en base : on reste sur la fiche
+      // pour que l'avertissement soit lu plutôt que balayé par la redirection.
+      if (res.warn) { setErr(res.warn); return; }
       router.push('/admin/products'); router.refresh();
     } catch (e2) {
       setErr(e2?.message || 'Erreur réseau.');

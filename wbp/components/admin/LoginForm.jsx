@@ -51,6 +51,16 @@ export default function LoginForm() {
 
   useEffect(() => { emailRef.current?.focus(); }, []);
 
+  // Compte valide mais absent de ADMIN_EMAILS : le filtre d'accès renvoie ici
+  // avec ?denied=1. Sans ce message, l'utilisateur bouclait sur la page de
+  // connexion sans comprendre pourquoi.
+  useEffect(() => {
+    if (sp.get('denied')) {
+      setErr('Ce compte n’est pas autorisé à accéder à l’administration. '
+        + 'Demandez l’ajout de votre adresse à la liste des administrateurs.');
+    }
+  }, [sp]);
+
   // Lien de récupération : Supabase pose la session puis émet PASSWORD_RECOVERY.
   useEffect(() => {
     const supabase = createClient();

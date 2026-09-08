@@ -1,24 +1,41 @@
 import { createAdminClient, hasSupabase } from '@/lib/supabase/server';
 import ShowcaseManager from '@/components/admin/ShowcaseManager';
+import { selectAll } from '@/lib/queries';
+import { PRODUCT_IMAGES } from '@/lib/product-images.generated';
 import { SITE } from '@/lib/site';
+
+// Même repli que sur le site public : si products.image_url est vide, on
+// utilise la photo livrée dans public/products. Sans cela, cet écran affichait
+// une pastille grise pour la quasi-totalité du catalogue.
+const withThumb = (p) => (p.image_url ? p : { ...p, image_url: (PRODUCT_IMAGES[p.id] || [])[0] || null });
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Admin — Vitrine' };
 
 // ----------------------------------------------------------------------------
-// Colonnes nécessaires à la vitrine. `featured` n'existe QU'APRÈS la migration
-// (supabase/upgrade.sql). Or PostgREST rejette la requête entière dès qu'une
-// colonne citée est inconnue : la page se retrouvait alors sans aucun produit,
-// sans le moindre message. On tente donc avec `featured`, puis sans.
+// `featured` et `images` n'existent QU'APRÈS la migration
+// (supabase/fix-all.sql). PostgREST rejette la requête ENTIÈRE dès qu'une
+// colonne citée est inconnue : la page se retrouvait alors sans aucun produit
+// et sans le moindre message. On essaie donc du jeu de colonnes le plus riche
+// au plus pauvre, jusqu'à ce que ça passe.
+//
+// `.limit(4000)` était par ailleurs trompeur : PostgREST plafonne de toute
+// façon chaque réponse à 1000 lignes, donc le catalogue était tronqué en
+// silence au-delà. selectAll() pagine jusqu'au dernier produit.
 // ----------------------------------------------------------------------------
-const COLS = 'id,name,code,cat,brand,image_url,active';
+const BASE = 'id,name,code,cat,brand,image_url,active';
+const TRIES = [`${BASE},images,featured`, `${BASE},featured`, `${BASE},images`, BASE];
 
 async function loadProducts(sb) {
-  const withFeatured = await sb.from('products').select(`${COLS},featured`).order('sort').limit(4000);
-  if (!withFeatured.error) return { rows: withFeatured.data || [], hasFeatured: true, error: null };
-
-  const plain = await sb.from('products').select(COLS).order('sort').limit(4000);
-  return { rows: plain.data || [], hasFeatured: false, error: plain.error || null };
+  let last = null;
+  for (const cols of TRIES) {
+    const res = await selectAll(() => sb.from('products').select(cols).order('sort').order('id'));
+    if (!res.error) {
+      return { rows: (res.data || []).map(withThumb), hasFeatured: cols.includes('featured'), error: null };
+    }
+    last = res.error;
+  }
+  return { rows: [], hasFeatured: false, error: last };
 }
 
 export default async function ShowcasePage() {
@@ -73,10 +90,15 @@ export default async function ShowcasePage() {
 
       {!migrated && (
         <div className="adm-err" style={{ marginBottom: 16 }}>
-          La table de la vitrine (<b>featured_picks</b>) n’existe pas encore dans cette base :
-          lancez <b>apply-upgrade.bat</b> une fois — ou collez <b>supabase/upgrade.sql</b> dans
-          Supabase → SQL Editor → Run. En attendant, la sélection ci-dessous utilise l’ancienne
-          case « ★ mis en avant » et l’enregistrement échouera.
+          <b>La base n’est pas encore à jour</b> — la table <code>featured_picks</code> manque,
+          l’ordre exact des produits ne peut donc pas être enregistré.
+          <br />
+          Correction en 2 minutes : ouvrez <b>Supabase → SQL Editor → New query</b>, collez le
+          fichier <b>supabase/fix-all.sql</b> du projet, puis cliquez <b>Run</b>. Une seule fois,
+          sans risque pour vos données.
+          <br />
+          En attendant, votre sélection est bien enregistrée via la case « ★ mis en avant » —
+          seul l’ordre précis est perdu.
         </div>
       )}
 

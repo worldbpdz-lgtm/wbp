@@ -44,12 +44,22 @@ const LISTS = {
 };
 
 function Thumb({ p }) {
-  if (p.image_url) {
+  const [broken, setBroken] = React.useState(false);
+  if (p.image_url && !broken) {
     // eslint-disable-next-line @next/next/no-img-element
-    return <img className="shw-thumb" src={p.image_url} alt="" loading="lazy" />;
+    return <img className="shw-thumb" src={p.image_url} alt="" loading="lazy" onError={() => setBroken(true)} />;
   }
   return <span className="shw-thumb shw-thumb-ph"><Icon name="box" size={16} /></span>;
 }
+
+// Nombre de lignes rendues d'un coup dans la colonne de gauche. Le catalogue
+// n'est plus tronqué à 200 : on affiche par tranches avec un bouton
+// « Afficher plus », donc tous les produits restent atteignables.
+const CHUNK = 100;
+
+// Plafond de la sélection. Doit rester identique à MAX_PICKS dans
+// app/admin/actions.js, sinon l'écran promet plus que le serveur n'enregistre.
+const MAX_PICKS = 200;
 
 export default function ShowcaseManager({ products = [], brands = [], categories = [], initial = [], list = 'showcase' }) {
   const L = LISTS[list] || LISTS.showcase;
@@ -61,21 +71,30 @@ export default function ShowcaseManager({ products = [], brands = [], categories
   const [q, setQ] = useState('');
   const [msg, setMsg] = useState(null);
   const [drag, setDrag] = useState(null);
+  const [shown, setShown] = useState(CHUNK);
 
   const byId = useMemo(() => Object.fromEntries(products.map((p) => [p.id, p])), [products]);
   const catName = (id) => categories.find((c) => c.id === id)?.name?.fr || id;
   const brandName = (id) => brands.find((b) => b.id === id)?.name || id;
 
+  const pickedSet = useMemo(() => new Set(picked), [picked]);
+
+  // Tous les produits correspondant aux filtres — plus aucune limite à 200.
   const available = useMemo(() => {
     const s = q.trim().toLowerCase();
     return products.filter((p) => {
-      if (picked.includes(p.id)) return false;
+      if (pickedSet.has(p.id)) return false;
       if (cat !== 'all' && p.cat !== cat) return false;
       if (brand !== 'all' && p.brand !== brand) return false;
       if (s && !`${p.name} ${p.code}`.toLowerCase().includes(s)) return false;
       return true;
-    }).slice(0, 200);
-  }, [products, picked, cat, brand, q]);
+    });
+  }, [products, pickedSet, cat, brand, q]);
+
+  // Seule la portion affichée est limitée (performance du rendu), et le bouton
+  // « Afficher plus » descend jusqu'au bout de la liste.
+  const visible = available.slice(0, shown);
+  React.useEffect(() => { setShown(CHUNK); }, [cat, brand, q]);
 
   const add = (id) => { setPicked((v) => (v.includes(id) ? v : [...v, id])); setMsg(null); };
   const remove = (id) => { setPicked((v) => v.filter((x) => x !== id)); setMsg(null); };
@@ -87,6 +106,7 @@ export default function ShowcaseManager({ products = [], brands = [], categories
     setMsg(null);
   };
   const addAllVisible = () => { setPicked((v) => [...v, ...available.slice(0, 24).map((p) => p.id).filter((id) => !v.includes(id))]); setMsg(null); };
+  const addEveryMatch = () => { setPicked((v) => [...v, ...available.map((p) => p.id).filter((id) => !v.includes(id))].slice(0, MAX_PICKS)); setMsg(null); };
 
   // Glisser-déposer dans la colonne de droite.
   const onDrop = (to) => {
@@ -99,8 +119,12 @@ export default function ShowcaseManager({ products = [], brands = [], categories
     setMsg(null);
     startTransition(async () => {
       const res = await L.save(picked);
-      if (res?.ok) { setMsg({ kind: 'ok', text: L.savedText(res.count) }); router.refresh(); }
-      else setMsg({ kind: 'err', text: res?.error || 'Enregistrement impossible.' });
+      if (res?.ok) {
+        setMsg(res.warn
+          ? { kind: 'err', text: res.warn }
+          : { kind: 'ok', text: L.savedText(res.count) });
+        router.refresh();
+      } else setMsg({ kind: 'err', text: res?.error || 'Enregistrement impossible.' });
     });
   };
 
@@ -148,13 +172,18 @@ export default function ShowcaseManager({ products = [], brands = [], categories
           <div className="adm-panel-hd">
             <h2>Catalogue <span className="adm-count">{available.length}</span></h2>
             {available.length > 0 && (
-              <button type="button" className="adm-btn sm" onClick={addAllVisible}>+ Ajouter les 24 premiers</button>
+              <span className="adm-actions">
+                <button type="button" className="adm-btn sm" onClick={addAllVisible}>+ 24 premiers</button>
+                <button type="button" className="adm-btn sm" onClick={addEveryMatch}>
+                  + Tout ajouter ({Math.min(available.length, MAX_PICKS - picked.length)})
+                </button>
+              </span>
             )}
           </div>
           <div className="shw-list">
             {available.length === 0 ? (
               <div className="adm-empty">Aucun produit disponible avec ces filtres.</div>
-            ) : available.map((p) => (
+            ) : visible.map((p) => (
               <button type="button" key={p.id} className="shw-row" onClick={() => add(p.id)} title={L.addTitle}>
                 <Thumb p={p} />
                 <span className="shw-row-txt">
@@ -164,6 +193,12 @@ export default function ShowcaseManager({ products = [], brands = [], categories
                 <span className="shw-add" aria-hidden="true">+</span>
               </button>
             ))}
+            {available.length > visible.length && (
+              <button type="button" className="adm-btn" style={{ margin: '10px auto', display: 'block' }}
+                onClick={() => setShown((v) => v + CHUNK)}>
+                Afficher plus ({visible.length} / {available.length})
+              </button>
+            )}
           </div>
         </div>
 

@@ -124,10 +124,15 @@ export function ProductImage({ product, size = 'card' }) {
   const glyph = cat ? cat.icon : 'box';
   const tint = brand ? brand.color : '#FF5A1F';
   const big = size === 'hero';
-  if (product.image_url) {
+  // Une URL morte (fichier supprimé, lien externe qui bloque le hotlinking)
+  // affichait auparavant l'icône « image cassée » du navigateur. On repasse
+  // désormais sur le visuel généré, qui reste présentable.
+  const [broken, setBroken] = React.useState(false);
+  React.useEffect(() => { setBroken(false); }, [product.image_url]);
+  if (product.image_url && !broken) {
     return (
       <div className={`prod-img prod-img-photo ${big ? 'prod-img-hero' : ''}`} style={{ '--tint': tint }}>
-        <img src={product.image_url} alt={product.name} loading="lazy" />
+        <img src={product.image_url} alt={product.name} loading="lazy" onError={() => setBroken(true)} />
       </div>
     );
   }

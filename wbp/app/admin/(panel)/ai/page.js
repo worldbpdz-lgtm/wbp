@@ -27,19 +27,24 @@ export default async function AiPage() {
         <div>
           <h1 className="adm-h1">Assistant IA</h1>
           <p className="adm-sub">
-            Branchez le chat du site sur votre plateforme d-tech-ai, ou laissez l’assistant
-            répondre à partir du catalogue. Testez la connexion avant d’enregistrer.
+            Par défaut, l’assistant répond à partir de votre catalogue, sans aucun service
+            externe ni abonnement. Vous pouvez aussi le brancher sur la plateforme de chat
+            de votre choix. Testez la connexion avant d’enregistrer.
           </p>
         </div>
         <span className={`adm-tag ${config.enabled ? 'ok' : 'gray'}`}>
-          {config.enabled ? (config.provider === 'dtech' ? 'Plateforme connectée' : 'Assistant catalogue') : 'Chat désactivé'}
+          {config.enabled
+            ? (config.provider === 'builtin' ? 'Assistant catalogue' : 'Plateforme connectée')
+            : 'Chat désactivé'}
         </span>
       </div>
 
       {!config.configured && (
         <div className="adm-err" style={{ marginBottom: 16 }}>
-          La table <code>ai_config</code> n’existe pas encore : lancez <b>apply-upgrade.bat</b> une fois
-          pour pouvoir enregistrer vos réglages. En attendant, le chat fonctionne en mode catalogue.
+          La table <code>ai_config</code> n’existe pas encore, vos réglages ne peuvent donc pas être
+          enregistrés. Ouvrez <b>Supabase → SQL Editor → New query</b>, collez le fichier
+          <b> supabase/fix-all.sql</b> puis cliquez <b>Run</b> (une seule fois).
+          En attendant, le chat fonctionne en mode catalogue.
         </div>
       )}
 

@@ -1,7 +1,7 @@
 // ============================================================================
 // /api/chat/poll — récupère les réponses arrivées APRÈS le tour de l'IA.
 // ----------------------------------------------------------------------------
-// Sur la plateforme d-tech-ai, une conversation peut être reprise par un
+// Sur une plateforme de chat externe, une conversation peut être reprise par un
 // conseiller humain (« handoff »). Le POST de streaming ne couvre que la réponse
 // immédiate de l'IA ; ce point d'entrée permet au chat de recevoir aussi les
 // messages du conseiller. Sans plateforme configurée, il renvoie simplement une
@@ -24,7 +24,7 @@ export async function GET(req) {
   if (!conversationId) return json({ messages: [], aiActive: true });
 
   const cfg = await getAiConfig();
-  if (!(cfg.enabled && cfg.provider === 'dtech' && cfg.base_url && cfg.widget_key)) {
+  if (!(cfg.enabled && cfg.provider !== 'builtin' && cfg.base_url && cfg.widget_key)) {
     return json({ messages: [], aiActive: true, supported: false });
   }
 

@@ -1,11 +1,13 @@
 'use client';
 // ============================================================================
-// /admin/ai — brancher l'assistant du site sur votre plateforme IA.
+// /admin/ai — brancher l'assistant du site sur une plateforme IA.
 // ----------------------------------------------------------------------------
 // Deux modes :
-//   • « Ma plateforme IA » (d-tech-ai / messaging-ai) : URL + clé du widget.
-//     Le site parle à sa propre route /api/chat, qui relaie vers la plateforme.
-//     La clé ne quitte jamais le serveur.
+//   • « Plateforme externe » : URL + clé du widget, saisies par l'admin.
+//     Aucun fournisseur n'est nommé ni imposé — n'importe quelle plateforme
+//     exposant /api/widget/messages convient. Le site parle à sa propre route
+//     /api/chat, qui relaie vers la plateforme ; la clé ne quitte jamais le
+//     serveur.
 //   • « Assistant catalogue » : réponses construites à partir du catalogue WBP,
 //     sans service externe. C'est aussi le filet de sécurité automatique si la
 //     plateforme ne répond pas.
@@ -61,7 +63,9 @@ export default function AiSettingsManager({ config, siteUrl }) {
     } finally { setTesting(false); }
   };
 
-  const isPlatform = f.provider === 'dtech';
+  // 'external' est la valeur courante ; 'dtech' est l'ancien nom conservé pour
+  // les configurations déjà enregistrées en base.
+  const isPlatform = f.provider === 'external' || f.provider === 'dtech';
 
   return (
     <form onSubmit={save}>
@@ -71,9 +75,9 @@ export default function AiSettingsManager({ config, siteUrl }) {
         <div className="adm-panel-bd">
           <div className="ai-modes">
             <label className={`ai-mode ${isPlatform ? 'on' : ''}`}>
-              <input type="radio" name="provider" value="dtech" checked={isPlatform} onChange={set('provider')} />
-              <b>Ma plateforme IA</b>
-              <small>d-tech-ai / messaging-ai. Le site relaie les messages vers votre plateforme : mémoire des conversations, reprise par un conseiller, WhatsApp et Instagram au même endroit.</small>
+              <input type="radio" name="provider" value="external" checked={isPlatform} onChange={set('provider')} />
+              <b>Plateforme externe</b>
+              <small>Le site relaie les messages vers la plateforme de chat de votre choix : mémoire des conversations, reprise par un conseiller, canaux WhatsApp et Instagram au même endroit. Vous fournissez l’adresse et la clé.</small>
             </label>
             <label className={`ai-mode ${f.provider === 'builtin' ? 'on' : ''}`}>
               <input type="radio" name="provider" value="builtin" checked={f.provider === 'builtin'} onChange={set('provider')} />
@@ -103,11 +107,11 @@ export default function AiSettingsManager({ config, siteUrl }) {
           <div className="adm-panel-bd">
             <div className="adm-grid2">
               <label>URL de la plateforme *
-                <input value={f.base_url} onChange={set('base_url')} placeholder="https://app.messaging-ai.com" spellCheck={false} />
+                <input value={f.base_url} onChange={set('base_url')} placeholder="https://votre-plateforme.exemple" spellCheck={false} />
               </label>
               <label>Clé publique du widget *
                 <span className="ai-keyrow">
-                  <input value={f.widget_key} onChange={set('widget_key')} placeholder="wgt_pk_…"
+                  <input value={f.widget_key} onChange={set('widget_key')} placeholder="clé publique du widget"
                     type={showKey ? 'text' : 'password'} spellCheck={false} autoComplete="off" />
                   <button type="button" className="adm-btn sm" onClick={() => setShowKey((v) => !v)}>
                     {showKey ? 'Masquer' : 'Afficher'}
@@ -119,9 +123,9 @@ export default function AiSettingsManager({ config, siteUrl }) {
             <div className="ai-help">
               <b>Où trouver ces deux valeurs ?</b>
               <ol>
-                <li>Ouvrez votre plateforme <em>d-tech-ai</em> et connectez-vous.</li>
-                <li>Allez dans <em>Canaux → Widget site web</em> et activez le canal.</li>
-                <li>Copiez la clé publique (<code>wgt_pk_…</code>) et l’adresse de la plateforme.</li>
+                <li>Connectez-vous à l’administration de votre plateforme de chat.</li>
+                <li>Ouvrez la section <em>Canaux → Widget site web</em> et activez le canal.</li>
+                <li>Copiez la clé publique du widget et l’adresse de la plateforme.</li>
               </ol>
               <p>
                 Le site appelle <code>{siteUrl || 'https://votre-site'}/api/chat</code>, qui relaie vers

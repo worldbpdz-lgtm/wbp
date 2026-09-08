@@ -3,7 +3,7 @@
 // ----------------------------------------------------------------------------
 // Sert deux rôles :
 //   1. l'assistant fonctionne dès l'installation, sans plateforme externe ;
-//   2. c'est le filet de sécurité quand la plateforme d-tech-ai est
+//   2. c'est le filet de sécurité quand la plateforme externe est
 //      injoignable — le visiteur obtient toujours une réponse utile plutôt
 //      qu'un message d'erreur.
 // Aucun appel réseau : recherche par mots-clés dans le catalogue Supabase,

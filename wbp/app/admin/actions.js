@@ -33,10 +33,12 @@ function friendly(error, what = 'Cet élément') {
     return `Le champ « ${fr} » est obligatoire.`;
   }
   if (/column "(\w+)" .*does not exist/i.test(m)) {
-    return 'La base n\'est pas à jour : lancez apply-upgrade.bat une fois, puis réessayez.';
+    return 'La base n\'est pas à jour. Ouvrez Supabase → SQL Editor → New query, collez le fichier '
+      + 'supabase/fix-all.sql du projet, cliquez Run, puis réessayez.';
   }
   if (/relation "(\w+)" does not exist/i.test(m)) {
-    return 'La base n\'est pas à jour : lancez apply-upgrade.bat une fois, puis réessayez.';
+    return 'La base n\'est pas à jour. Ouvrez Supabase → SQL Editor → New query, collez le fichier '
+      + 'supabase/fix-all.sql du projet, cliquez Run, puis réessayez.';
   }
   if (/JWT|Invalid API key/i.test(m)) return 'Clé Supabase invalide — vérifiez SUPABASE_SERVICE_ROLE_KEY.';
   return m || 'Erreur inconnue.';
@@ -46,6 +48,34 @@ export async function signOutAction() {
   const sb = await createClient();
   await sb.auth.signOut();
   redirect('/admin/login');
+}
+
+// ============================================================================
+// Colonnes qui n'existent que sur une base MIGRÉE (supabase/fix-all.sql).
+// ----------------------------------------------------------------------------
+// PostgREST rejette la requête ENTIÈRE dès qu'une colonne citée est inconnue.
+// Tant que la migration n'était pas appliquée, `images` et `featured` faisaient
+// donc échouer CHAQUE enregistrement de produit — c'est la cause du
+// « je modifie un produit et je ne peux pas l'enregistrer ». On réessaie
+// maintenant sans les colonnes fautives : la fiche est sauvegardée dans tous
+// les cas, et l'admin est prévenu de ce qui n'a pas pu être stocké.
+// ============================================================================
+const OPTIONAL_PRODUCT_COLS = ['images', 'featured', 'price'];
+
+async function upsertTolerant(sb, table, row, onConflict, optional) {
+  const attempt = { ...row };
+  const dropped = [];
+  for (let i = 0; i <= optional.length; i++) {
+    const { error } = await sb.from(table).upsert(attempt, { onConflict });
+    if (!error) return { error: null, dropped };
+    // « column "x" does not exist » / « Could not find the 'x' column »
+    const miss = optional.find((c) => c in attempt
+      && new RegExp(`['"\`]?${c}['"\`]?\\s+column|column ['"\`]?${c}['"\`]?`, 'i').test(error.message || ''));
+    if (!miss) return { error, dropped };
+    delete attempt[miss];
+    dropped.push(miss);
+  }
+  return { error: null, dropped };
 }
 
 // ---------- Products ----------
@@ -69,33 +99,55 @@ export async function upsertProduct(p) {
   if (!row.name) return { ok: false, error: 'Le nom du produit est obligatoire.' };
   if (!row.code) return { ok: false, error: 'La référence (code) est obligatoire.' };
   if (!row.id) return { ok: false, error: 'Identifiant impossible à déduire — saisissez-le manuellement.' };
-  const { error } = await sb.from('products').upsert(row, { onConflict: 'id' });
+  const { error, dropped } = await upsertTolerant(sb, 'products', row, 'id', OPTIONAL_PRODUCT_COLS);
   if (error) return { ok: false, error: friendly(error, 'Ce produit') };
-  revalidatePath('/admin/products'); revalidatePath('/admin/showcase'); revalidatePath('/', 'layout');
-  return { ok: true, id: row.id };
+  revalidatePath('/admin/products'); revalidatePath('/admin/showcase'); revalidatePath('/admin/arrivals'); revalidatePath('/', 'layout');
+  return {
+    ok: true,
+    id: row.id,
+    warn: dropped.length
+      ? `Produit enregistré, mais ${dropped.join(', ')} n'a pas pu être stocké : lancez supabase/fix-all.sql une fois.`
+      : null,
+  };
 }
 export async function deleteProduct(id) {
   await requireAdmin();
   const sb = createAdminClient();
-  const { error } = await sb.from('products').delete().eq('id', id);
-  if (error) return { ok: false, error: error.message };
-  revalidatePath('/admin/products'); revalidatePath('/');
+  const pid = s(id, 60);
+  if (!pid) return { ok: false, error: 'Identifiant manquant.' };
+  // Les listes de mise en avant référencent le produit. Selon l'ordre
+  // d'application des migrations, la contrainte peut ne pas être en
+  // « on delete cascade » : on nettoie donc explicitement avant de supprimer,
+  // sinon la suppression échoue avec une erreur de clé étrangère illisible.
+  for (const t of ['featured_picks', 'new_arrivals']) {
+    try { await sb.from(t).delete().eq('product_id', pid); } catch { /* table absente */ }
+  }
+  const { error } = await sb.from('products').delete().eq('id', pid);
+  if (error) return { ok: false, error: friendly(error, 'Ce produit') };
+  revalidatePath('/admin/products'); revalidatePath('/admin/showcase'); revalidatePath('/admin/arrivals'); revalidatePath('/', 'layout');
   return { ok: true };
 }
 export async function toggleProductActive(id, active) {
   await requireAdmin();
   const sb = createAdminClient();
-  await sb.from('products').update({ active }).eq('id', id);
-  revalidatePath('/admin/products'); revalidatePath('/');
+  const { error } = await sb.from('products').update({ active: !!active }).eq('id', s(id, 60));
+  if (error) return { ok: false, error: friendly(error, 'Ce produit') };
+  revalidatePath('/admin/products'); revalidatePath('/', 'layout');
   return { ok: true };
 }
 // Mis en avant : le produit remonte en tête du catalogue public.
 export async function toggleProductFeatured(id, featured) {
   await requireAdmin();
   const sb = createAdminClient();
-  const { error } = await sb.from('products').update({ featured }).eq('id', id);
-  if (error) return { ok: false, error: error.message };
-  revalidatePath('/admin/products'); revalidatePath('/');
+  const pid = s(id, 60);
+  const { error } = await sb.from('products').update({ featured: !!featured }).eq('id', pid);
+  if (error) return { ok: false, error: friendly(error, 'Ce produit') };
+  // On garde la vitrine cohérente avec l'étoile ★ (si la table existe).
+  try {
+    if (featured) await addToShowcase(pid);
+    else await sb.from('featured_picks').delete().eq('site', SITE).eq('product_id', pid);
+  } catch { /* table absente : la colonne `featured` suffit */ }
+  revalidatePath('/admin/products'); revalidatePath('/admin/showcase'); revalidatePath('/', 'layout');
   return { ok: true };
 }
 
@@ -345,29 +397,75 @@ export async function sendCampaign(id) {
 // reste partagé avec Central Network).
 // ============================================================================
 
+// Plafond de la sélection — doit rester égal à MAX_PICKS dans
+// components/admin/ShowcaseManager.jsx.
+const MAX_PICKS = 200;
+
+// « table absente » et non « colonne absente » : PGRST205 vise la table,
+// PGRST204 vise une colonne. Confondre les deux masquerait une vraie erreur.
+const missingTable = (error) => error?.code === 'PGRST205'
+  || /relation .* does not exist|could not find the table/i.test(String(error?.message || error || ''));
+
+/**
+ * Écrit une liste ordonnée (vitrine ou nouveautés) dans sa table dédiée.
+ * Si la table n'existe pas encore, on ne renvoie plus une erreur sèche :
+ * la sélection est repliée sur products.featured pour la vitrine, et l'admin
+ * reçoit un avertissement qui explique quoi faire.
+ */
+async function writeRankedList(sb, table, ids, label) {
+  const del = await sb.from(table).delete().eq('site', SITE);
+  if (del.error) {
+    if (missingTable(del.error)) return { missing: true };
+    return { error: friendly(del.error, label) };
+  }
+  if (ids.length) {
+    const rows = ids.map((product_id, i) => ({ site: SITE, product_id, rank: i }));
+    const { error } = await sb.from(table).insert(rows);
+    if (error) {
+      if (missingTable(error)) return { missing: true };
+      return { error: friendly(error, label) };
+    }
+  }
+  return { ok: true };
+}
+
+/** Synchronise products.featured avec la sélection (tri de secours + étoile ★). */
+async function syncFeaturedColumn(sb, ids) {
+  const off = await sb.from('products').update({ featured: false }).eq('featured', true);
+  if (off.error) return false; // colonne absente : base non migrée
+  if (ids.length) await sb.from('products').update({ featured: true }).in('id', ids);
+  return true;
+}
+
 /** Remplace toute la vitrine par la liste ordonnée fournie. */
 export async function saveShowcase(productIds) {
   await requireAdmin();
   const sb = createAdminClient();
   const ids = Array.from(new Set((Array.isArray(productIds) ? productIds : [])
-    .map((x) => s(x, 60)).filter(Boolean))).slice(0, 60);
+    .map((x) => s(x, 60)).filter(Boolean))).slice(0, MAX_PICKS);
 
-  const del = await sb.from('featured_picks').delete().eq('site', SITE);
-  if (del.error) return { ok: false, error: friendly(del.error, 'La vitrine') };
+  const res = await writeRankedList(sb, 'featured_picks', ids, 'La vitrine');
+  if (res.error) return { ok: false, error: res.error };
 
-  if (ids.length) {
-    const rows = ids.map((product_id, i) => ({ site: SITE, product_id, rank: i }));
-    const { error } = await sb.from('featured_picks').insert(rows);
-    if (error) return { ok: false, error: friendly(error, 'La vitrine') };
-  }
-
-  // On garde products.featured synchronisé : la colonne sert au tri de secours
-  // et à l'étoile ★ dans la liste des produits.
-  await sb.from('products').update({ featured: false }).eq('featured', true);
-  if (ids.length) await sb.from('products').update({ featured: true }).in('id', ids);
+  const synced = await syncFeaturedColumn(sb, ids);
 
   revalidatePath('/admin/showcase'); revalidatePath('/admin/products'); revalidatePath('/', 'layout');
-  return { ok: true, count: ids.length };
+
+  if (res.missing && !synced) {
+    return {
+      ok: false,
+      error: 'La base n\'est pas à jour : ni la table featured_picks ni la colonne products.featured n\'existent. '
+        + 'Collez supabase/fix-all.sql dans Supabase → SQL Editor → Run, puis réessayez.',
+    };
+  }
+  return {
+    ok: true,
+    count: ids.length,
+    warn: res.missing
+      ? 'Sélection enregistrée via l\'étoile ★, mais l\'ORDRE exact demande la table featured_picks : '
+        + 'collez supabase/fix-all.sql dans Supabase → SQL Editor → Run.'
+      : null,
+  };
 }
 
 /** Ajoute un produit à la fin de la vitrine. */
@@ -380,7 +478,7 @@ export async function addToShowcase(productId) {
     .eq('site', SITE).order('rank', { ascending: false }).limit(1).maybeSingle();
   const { error } = await sb.from('featured_picks')
     .upsert({ site: SITE, product_id: pid, rank: (last?.rank ?? -1) + 1 }, { onConflict: 'site,product_id' });
-  if (error) return { ok: false, error: friendly(error, 'La vitrine') };
+  if (error && !missingTable(error)) return { ok: false, error: friendly(error, 'La vitrine') };
   await sb.from('products').update({ featured: true }).eq('id', pid);
   revalidatePath('/admin/showcase'); revalidatePath('/', 'layout');
   return { ok: true };
@@ -392,7 +490,7 @@ export async function removeFromShowcase(productId) {
   const sb = createAdminClient();
   const pid = s(productId, 60);
   const { error } = await sb.from('featured_picks').delete().eq('site', SITE).eq('product_id', pid);
-  if (error) return { ok: false, error: friendly(error, 'La vitrine') };
+  if (error && !missingTable(error)) return { ok: false, error: friendly(error, 'La vitrine') };
   await sb.from('products').update({ featured: false }).eq('id', pid);
   revalidatePath('/admin/showcase'); revalidatePath('/', 'layout');
   return { ok: true };
@@ -410,15 +508,16 @@ export async function saveArrivals(productIds) {
   await requireAdmin();
   const sb = createAdminClient();
   const ids = Array.from(new Set((Array.isArray(productIds) ? productIds : [])
-    .map((x) => s(x, 60)).filter(Boolean))).slice(0, 60);
+    .map((x) => s(x, 60)).filter(Boolean))).slice(0, MAX_PICKS);
 
-  const del = await sb.from('new_arrivals').delete().eq('site', SITE);
-  if (del.error) return { ok: false, error: friendly(del.error, 'Les nouveautés') };
-
-  if (ids.length) {
-    const rows = ids.map((product_id, i) => ({ site: SITE, product_id, rank: i }));
-    const { error } = await sb.from('new_arrivals').insert(rows);
-    if (error) return { ok: false, error: friendly(error, 'Les nouveautés') };
+  const res = await writeRankedList(sb, 'new_arrivals', ids, 'Les nouveautés');
+  if (res.error) return { ok: false, error: res.error };
+  if (res.missing) {
+    return {
+      ok: false,
+      error: 'La table new_arrivals n\'existe pas encore. Collez supabase/fix-all.sql dans '
+        + 'Supabase → SQL Editor → Run (une seule fois), puis réessayez.',
+    };
   }
 
   // On ne touche PAS au champ `badge` de la fiche produit : la pastille
@@ -430,13 +529,19 @@ export async function saveArrivals(productIds) {
 
 // ============================================================================
 // ASSISTANT IA — configuration (table privée ai_config, jamais exposée au client)
+// ----------------------------------------------------------------------------
+// Aucun fournisseur n'est nommé ni imposé : 'builtin' répond à partir du
+// catalogue WBP, 'external' relaie vers la plateforme de chat que l'admin
+// renseigne lui-même. 'dtech' est l'ancien nom de 'external', conservé
+// uniquement pour ne pas casser les configurations déjà en base.
 // ============================================================================
-const AI_PROVIDERS = ['dtech', 'builtin', 'off'];
+const AI_PROVIDERS = ['external', 'builtin', 'off'];
+const normProvider = (v) => (v === 'dtech' ? 'external' : (AI_PROVIDERS.includes(v) ? v : 'builtin'));
 
 export async function saveAiConfig(cfg) {
   await requireAdmin();
   const sb = createAdminClient();
-  const provider = AI_PROVIDERS.includes(cfg.provider) ? cfg.provider : 'builtin';
+  const provider = normProvider(cfg.provider);
   const row = {
     site: SITE,
     enabled: provider !== 'off' && !!cfg.enabled,
@@ -453,10 +558,13 @@ export async function saveAiConfig(cfg) {
     accent: s(cfg.accent, 20) || '#FF5A1F',
     updated_at: new Date().toISOString(),
   };
-  if (row.provider === 'dtech') {
-    if (!row.base_url) return { ok: false, error: 'Renseignez l\'URL de votre plateforme IA (ex. https://app.messaging-ai.com).' };
-    if (!/^https?:\/\//i.test(row.base_url)) return { ok: false, error: 'L\'URL doit commencer par https://' };
-    if (!row.widget_key) return { ok: false, error: 'Renseignez la clé du widget (wgt_pk_…).' };
+  if (row.provider === 'external') {
+    if (!row.base_url) return { ok: false, error: 'Renseignez l\'adresse de votre plateforme de chat.' };
+    if (!/^https:\/\//i.test(row.base_url)) {
+      // HTTPS obligatoire : la clé du widget transite dans cette requête.
+      return { ok: false, error: 'L\'adresse doit commencer par https:// (le http simple n\'est pas chiffré).' };
+    }
+    if (!row.widget_key) return { ok: false, error: 'Renseignez la clé publique du widget.' };
   }
   const { error } = await sb.from('ai_config').upsert(row, { onConflict: 'site' });
   if (error) return { ok: false, error: friendly(error, 'La configuration IA') };
@@ -472,11 +580,32 @@ function splitLines(v) {
  * Teste la connexion à la plateforme IA sans rien enregistrer : envoie un vrai
  * message « ping » et regarde si le flux répond. Renvoie un diagnostic clair.
  */
+// Refuse les adresses internes. Sans ce garde-fou, cette action laisserait
+// sonder le réseau privé de l'hébergeur depuis le serveur WBP — y compris les
+// services de métadonnées cloud (169.254.169.254) qui distribuent des jetons
+// d'accès. C'est la faille « SSRF ».
+function isPrivateHost(host) {
+  const h = String(host || '').toLowerCase();
+  if (h === 'localhost' || h.endsWith('.localhost') || h.endsWith('.internal') || h.endsWith('.local')) return true;
+  if (/^\[?::1\]?$/.test(h) || /^\[?fd[0-9a-f]{2}:/i.test(h) || /^\[?fe80:/i.test(h)) return true;
+  const m = h.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (!m) return false;
+  const [a, b] = [Number(m[1]), Number(m[2])];
+  return a === 0 || a === 10 || a === 127
+    || (a === 169 && b === 254)                  // métadonnées cloud
+    || (a === 172 && b >= 16 && b <= 31)
+    || (a === 192 && b === 168)
+    || (a === 100 && b >= 64 && b <= 127);
+}
+
 export async function testAiConnection({ base_url, widget_key }) {
   await requireAdmin();
   const base = (s(base_url, 300) || '').replace(/\/+$/, '');
   const key = s(widget_key, 200);
-  if (!base || !/^https?:\/\//i.test(base)) return { ok: false, error: 'URL invalide — elle doit commencer par https://' };
+  if (!base || !/^https:\/\//i.test(base)) return { ok: false, error: 'Adresse invalide — elle doit commencer par https://' };
+  let host = '';
+  try { host = new URL(base).hostname; } catch { return { ok: false, error: 'Adresse invalide.' }; }
+  if (isPrivateHost(host)) return { ok: false, error: 'Adresse réseau interne refusée. Indiquez l\'adresse publique de votre plateforme.' };
   if (!key) return { ok: false, error: 'Clé du widget manquante.' };
 
   const url = `${base}/api/widget/messages`;

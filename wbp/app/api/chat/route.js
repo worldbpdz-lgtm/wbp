@@ -2,8 +2,9 @@
 // /api/chat — point d'entrée du chat de l'assistant WBP.
 // ----------------------------------------------------------------------------
 // Pourquoi un proxy et pas le script widget de la plateforme ?
-// Le widget d-tech-ai appelle « /api/widget/messages » en chemin RELATIF : il ne
-// fonctionne donc que sur le domaine de la plateforme elle-même. En passant par
+// Le widget d'une plateforme de chat appelle « /api/widget/messages » en chemin
+// RELATIF : il ne fonctionne donc que sur le domaine de la plateforme
+// elle-même. En passant par
 // cette route, le navigateur du visiteur parle à wbp-dz.com, et c'est le serveur
 // WBP qui relaie vers la plateforme. Avantages :
 //   • plus de problème d'origine différente (CORS) ;
@@ -18,6 +19,7 @@
 import { getAiConfig } from '@/lib/queries';
 import { answer } from '@/lib/ai/assistant';
 import { createAdminClient, hasSupabase } from '@/lib/supabase/server';
+import { hit } from '@/lib/ratelimit';
 import { SITE } from '@/lib/site';
 
 export const runtime = 'nodejs';
@@ -59,6 +61,21 @@ function streamText(text, { conversationId = null, products = [], source }) {
 }
 
 export async function POST(req) {
+  // ---- Limitation de débit -------------------------------------------------
+  // Ce point d'entrée est public et relaie vers une plateforme IA facturée à
+  // l'usage. Sans plafond, un script pouvait envoyer des messages en boucle :
+  // facture d'IA, table ai_messages saturée, et le chat inutilisable pour les
+  // vrais visiteurs.
+  const ip = (req.headers.get('x-forwarded-for') || '').split(',')[0].trim()
+    || req.headers.get('x-real-ip') || 'local';
+  const rl = hit(`chat:${ip}`, 20, 60_000);
+  if (!rl.ok) {
+    return new Response(JSON.stringify({ error: 'rate_limited' }), {
+      status: 429,
+      headers: { 'Content-Type': 'application/json', 'Retry-After': String(rl.retryAfter) },
+    });
+  }
+
   let body = {};
   try { body = await req.json(); } catch { /* corps illisible */ }
 
@@ -82,8 +99,8 @@ export async function POST(req) {
 
   log(sessionId, 'user', message);
 
-  // ---- Mode plateforme (d-tech-ai / messaging-ai) --------------------------
-  if (cfg.provider === 'dtech' && cfg.base_url && cfg.widget_key) {
+  // ---- Mode plateforme externe ---------------------------------------------
+  if (cfg.provider !== 'builtin' && cfg.base_url && cfg.widget_key) {
     const upstream = `${String(cfg.base_url).replace(/\/+$/, '')}/api/widget/messages`;
     try {
       const ctrl = new AbortController();
