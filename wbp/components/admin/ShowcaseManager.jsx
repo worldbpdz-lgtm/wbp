@@ -96,7 +96,17 @@ export default function ShowcaseManager({ products = [], brands = [], categories
   const visible = available.slice(0, shown);
   React.useEffect(() => { setShown(CHUNK); }, [cat, brand, q]);
 
-  const add = (id) => { setPicked((v) => (v.includes(id) ? v : [...v, id])); setMsg(null); };
+  // Le serveur tronque la sélection à MAX_PICKS. Sans le même plafond ici,
+  // l'écran laissait ajouter 210 produits puis annonçait « 200 enregistrés »
+  // en en perdant 10 sans le dire.
+  const room = Math.max(0, MAX_PICKS - picked.length);
+  const full = () => setMsg({ kind: 'err', text: `Maximum ${MAX_PICKS} produits dans cette liste.` });
+  const add = (id) => {
+    if (picked.includes(id)) return;
+    if (picked.length >= MAX_PICKS) { full(); return; }
+    setPicked((v) => (v.includes(id) ? v : [...v, id]));
+    setMsg(null);
+  };
   const remove = (id) => { setPicked((v) => v.filter((x) => x !== id)); setMsg(null); };
   const move = (i, d) => {
     setPicked((v) => {
@@ -105,8 +115,16 @@ export default function ShowcaseManager({ products = [], brands = [], categories
     });
     setMsg(null);
   };
-  const addAllVisible = () => { setPicked((v) => [...v, ...available.slice(0, 24).map((p) => p.id).filter((id) => !v.includes(id))]); setMsg(null); };
-  const addEveryMatch = () => { setPicked((v) => [...v, ...available.map((p) => p.id).filter((id) => !v.includes(id))].slice(0, MAX_PICKS)); setMsg(null); };
+  // Les deux boutons d'ajout en masse respectent la place restante.
+  const addMany = (rows) => {
+    if (room === 0) { full(); return; }
+    const toAdd = rows.map((p) => p.id).filter((id) => !picked.includes(id)).slice(0, room);
+    if (!toAdd.length) return;
+    setPicked((v) => [...v, ...toAdd.filter((id) => !v.includes(id))].slice(0, MAX_PICKS));
+    setMsg(null);
+  };
+  const addAllVisible = () => addMany(available.slice(0, 24));
+  const addEveryMatch = () => addMany(available);
 
   // Glisser-déposer dans la colonne de droite.
   const onDrop = (to) => {
@@ -174,8 +192,8 @@ export default function ShowcaseManager({ products = [], brands = [], categories
             {available.length > 0 && (
               <span className="adm-actions">
                 <button type="button" className="adm-btn sm" onClick={addAllVisible}>+ 24 premiers</button>
-                <button type="button" className="adm-btn sm" onClick={addEveryMatch}>
-                  + Tout ajouter ({Math.min(available.length, MAX_PICKS - picked.length)})
+                <button type="button" className="adm-btn sm" onClick={addEveryMatch} disabled={room === 0}>
+                  + Tout ajouter ({Math.min(available.length, room)})
                 </button>
               </span>
             )}

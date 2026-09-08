@@ -26,9 +26,9 @@ function sessionId() {
 }
 
 const LBL = {
-  fr: { title: 'Assistant', online: 'En ligne · réponse immédiate', ph: 'Écrivez votre question…', send: 'Envoyer', restart: 'Nouvelle conversation', quote: 'Demander un devis', wa: 'WhatsApp', err: 'Connexion interrompue. Réessayez ou écrivez-nous sur WhatsApp.', human: 'Un conseiller a rejoint la conversation', ai_note: 'Réponses générées automatiquement — un ingénieur vérifie chaque devis.' },
-  en: { title: 'Assistant', online: 'Online · instant reply', ph: 'Type your question…', send: 'Send', restart: 'New conversation', quote: 'Request a quote', wa: 'WhatsApp', err: 'Connection interrupted. Try again or reach us on WhatsApp.', human: 'An advisor joined the conversation', ai_note: 'Answers are generated automatically — an engineer checks every quote.' },
-  ar: { title: 'المساعد', online: 'متصل · رد فوري', ph: 'اكتب سؤالك…', send: 'إرسال', restart: 'محادثة جديدة', quote: 'طلب عرض سعر', wa: 'واتساب', err: 'انقطع الاتصال. حاول مرة أخرى أو تواصل معنا على واتساب.', human: 'انضم مستشار إلى المحادثة', ai_note: 'الردود تُولّد آلياً — يتحقق مهندس من كل عرض سعر.' },
+  fr: { title: 'Assistant', online: 'En ligne · réponse immédiate', ph: 'Écrivez votre question…', send: 'Envoyer', restart: 'Nouvelle conversation', quote: 'Demander un devis', wa: 'WhatsApp', err: 'Connexion interrompue. Réessayez ou écrivez-nous sur WhatsApp.', rate: 'Vous envoyez des messages un peu vite. Patientez un instant avant de réessayer.', human: 'Un conseiller a rejoint la conversation', ai_note: 'Réponses générées automatiquement — un ingénieur vérifie chaque devis.' },
+  en: { title: 'Assistant', online: 'Online · instant reply', ph: 'Type your question…', send: 'Send', restart: 'New conversation', quote: 'Request a quote', wa: 'WhatsApp', err: 'Connection interrupted. Try again or reach us on WhatsApp.', rate: 'You are sending messages a bit fast. Please wait a moment before trying again.', human: 'An advisor joined the conversation', ai_note: 'Answers are generated automatically — an engineer checks every quote.' },
+  ar: { title: 'المساعد', online: 'متصل · رد فوري', ph: 'اكتب سؤالك…', send: 'إرسال', restart: 'محادثة جديدة', quote: 'طلب عرض سعر', wa: 'واتساب', err: 'انقطع الاتصال. حاول مرة أخرى أو تواصل معنا على واتساب.', rate: 'أنت ترسل الرسائل بسرعة كبيرة. يرجى الانتظار قليلاً قبل المحاولة مجدداً.', human: 'انضم مستشار إلى المحادثة', ai_note: 'الردود تُولّد آلياً — يتحقق مهندس من كل عرض سعر.' },
 };
 
 export default function AiChat({ config }) {
@@ -101,6 +101,8 @@ export default function AiChat({ config }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: text, lang, sessionId: sessionId(), conversationId }),
       });
+      // 429 = trop de messages en une minute : message d'attente dédié.
+      if (res.status === 429) throw new Error('rate_limited');
       if (!res.ok || !res.body) throw new Error(`http ${res.status}`);
 
       const reader = res.body.getReader();
@@ -131,13 +133,14 @@ export default function AiChat({ config }) {
       }
       setMsgs((m) => m.map((x, k) => (k === m.length - 1 ? { ...x, streaming: false, text: x.text || acc } : x)));
       if (!acc) throw new Error('empty');
-    } catch {
-      setMsgs((m) => m.map((x, k) => (k === m.length - 1 ? { ...x, streaming: false, error: true, text: L.err } : x)));
+    } catch (e) {
+      const msg = e?.message === 'rate_limited' ? L.rate : L.err;
+      setMsgs((m) => m.map((x, k) => (k === m.length - 1 ? { ...x, streaming: false, error: true, text: msg } : x)));
     } finally {
       setBusy(false);
       setTimeout(() => inputRef.current?.focus({ preventScroll: true }), 60);
     }
-  }, [draft, busy, lang, conversationId, L.err]);
+  }, [draft, busy, lang, conversationId, L.err, L.rate]);
 
   // Un conseiller humain peut reprendre la main : on interroge le serveur
   // pendant que le panneau est ouvert et qu'une conversation existe.

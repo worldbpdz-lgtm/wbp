@@ -1,7 +1,14 @@
 import { createAdminClient, hasSupabase } from '@/lib/supabase/server';
+import { selectAll } from '@/lib/queries';
 import { SITE } from '@/lib/site';
 
 const DAY = 86400000;
+// PostgREST plafonne chaque réponse à 1000 lignes : un `.limit(40000)` ne
+// ramenait en réalité qu'un échantillon arbitraire de 1000 événements. On
+// pagine donc explicitement, en partant des événements LES PLUS RÉCENTS, et on
+// s'arrête à EVENTS_MAX pour ne jamais relire toute la table : les chiffres
+// affichés portent sur les 40 000 derniers événements de la fenêtre.
+const EVENTS_MAX = 40000;
 const ymd = (d) => new Date(d).toISOString().slice(0, 10);
 const lastDays = (n) => { const out = []; const now = Date.now(); for (let i = n - 1; i >= 0; i--) out.push(ymd(now - i * DAY)); return out; };
 const trend = (cur, prev) => { if (!prev) return cur ? { dir: 'up', pct: 100 } : { dir: 'flat', pct: 0 }; const p = Math.round(((cur - prev) / prev) * 100); return { dir: p > 0 ? 'up' : (p < 0 ? 'down' : 'flat'), pct: Math.abs(p) }; };
@@ -14,11 +21,13 @@ export async function getDashboard() {
     const sb = createAdminClient();
     const since = new Date(Date.now() - 30 * DAY).toISOString();
     const [ev, quotes, msgs, reviews, products, cats, subsRes] = await Promise.all([
-      sb.from('events').select('type,product_id,device,session_id,created_at').eq('site', SITE).gte('created_at', since).limit(20000),
+      selectAll(() => sb.from('events').select('type,product_id,device,session_id,created_at').eq('site', SITE).gte('created_at', since).order('created_at', { ascending: false }).order('id', { ascending: false }), { max: EVENTS_MAX }),
       sb.from('quote_requests').select('id,customer_name,company,email,status,created_at').eq('site', SITE).order('created_at', { ascending: false }).limit(2000),
       sb.from('contact_messages').select('id,name,subject,status,created_at').eq('site', SITE).order('created_at', { ascending: false }).limit(2000),
       sb.from('reviews').select('id,product_id,author,rating,approved,created_at').eq('site', SITE).order('created_at', { ascending: false }).limit(2000),
-      sb.from('products').select('id,name,cat,active'),
+      // Paginé : le catalogue dépasse 1000 lignes, sinon le KPI « Produits » et
+      // le décompte par catégorie plafonneraient à 1000.
+      selectAll(() => sb.from('products').select('id,name,cat,active').order('id')),
       sb.from('categories').select('id,name'),
       sb.from('newsletter_subscribers').select('id', { count: 'exact', head: true }).eq('site', SITE),
     ]);
@@ -76,8 +85,10 @@ export async function getAnalytics() {
     const sb = createAdminClient();
     const since = new Date(Date.now() - 30 * DAY).toISOString();
     const [ev, products] = await Promise.all([
-      sb.from('events').select('type,path,product_id,device,referrer,session_id,created_at').eq('site', SITE).gte('created_at', since).limit(40000),
-      sb.from('products').select('id,name'),
+      selectAll(() => sb.from('events').select('type,path,product_id,device,referrer,session_id,created_at').eq('site', SITE).gte('created_at', since).order('created_at', { ascending: false }).order('id', { ascending: false }), { max: EVENTS_MAX }),
+      // Paginé : sans cela, les produits au-delà du 1000ᵉ n'ont pas de nom et
+      // « Produits les plus vus » affiche des identifiants bruts.
+      selectAll(() => sb.from('products').select('id,name').order('id')),
     ]);
     const events = ev.data || [], pname = Object.fromEntries((products.data || []).map((p) => [p.id, p.name]));
     const pv = events.filter((e) => e.type === 'page_view');

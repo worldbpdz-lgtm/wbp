@@ -8,7 +8,10 @@ import { CONTACT } from '@/lib/config';
 export default function Contact() {
   const { t, lang, nav, wbp, settings } = useApp();
   const [sent, setSent] = React.useState(false);
-  const [form, setForm] = React.useState({ name: '', company: '', email: '', phone: '', subject: '', message: '' });
+  const [sending, setSending] = React.useState(false);
+  const [err, setErr] = React.useState('');
+  // `website` = piège à robots (honeypot) : invisible pour les humains.
+  const [form, setForm] = React.useState({ name: '', company: '', email: '', phone: '', subject: '', message: '', website: '' });
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
   const ct = settings?.contact || {};
   const email = ct.email || CONTACT.emailDisplay;
@@ -23,7 +26,18 @@ export default function Contact() {
   ];
   const submit = async (e) => {
     e.preventDefault();
-    try { await submitContact(form); } catch { /* ignore */ }
+    if (sending) return;
+    setSending(true);
+    setErr('');
+    let ok = false;
+    try {
+      // L'action renvoie { ok:false, error } — elle ne lève pas d'exception.
+      const res = await submitContact(form);
+      ok = !!res?.ok;
+      if (!ok) setErr(res?.error && res.error !== 'invalid' ? res.error : t('form_invalid'));
+    } catch { setErr(t('form_error')); }
+    finally { setSending(false); }
+    if (!ok) return;
     setSent(true);
     try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch { /* ignore */ }
   };
@@ -66,7 +80,12 @@ export default function Contact() {
               </div>
               <label><span>{t('form_subject')}</span><input value={form.subject} onChange={set('subject')} /></label>
               <label><span>{t('form_message')}</span><textarea rows={5} required value={form.message} onChange={set('message')} /></label>
-              <button className="btn btn-primary btn-lg" type="submit"><Icon name="arrow" size={18} /> {t('form_send')}</button>
+              {/* Champ piège : masqué aux humains, aux lecteurs d'écran et à l'auto-remplissage. */}
+              <div aria-hidden="true" style={{ position: 'absolute', left: '-9999px', width: 1, height: 1, overflow: 'hidden' }}>
+                <input type="text" name="website" tabIndex={-1} autoComplete="off" value={form.website} onChange={set('website')} />
+              </div>
+              <button className="btn btn-primary btn-lg" type="submit" disabled={sending}><Icon name="arrow" size={18} /> {sending ? '…' : t('form_send')}</button>
+              {err && <p style={{ color: '#e5484d', fontSize: 13, margin: 0 }}>{err}</p>}
             </form>
           )}
         </Reveal>

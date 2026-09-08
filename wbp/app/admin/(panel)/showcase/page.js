@@ -26,6 +26,12 @@ export const metadata = { title: 'Admin — Vitrine' };
 const BASE = 'id,name,code,cat,brand,image_url,active';
 const TRIES = [`${BASE},images,featured`, `${BASE},featured`, `${BASE},images`, BASE];
 
+// On ne dégrade le jeu de colonnes QUE sur une erreur « colonne inconnue ».
+// Sinon une simple coupure réseau épuisait les quatre tentatives et affichait
+// « Le catalogue n'a pas pu être chargé » sur une base pourtant à jour.
+const missingColumn = (error) => error?.code === 'PGRST204'
+  || /column .* does not exist|could not find the .* column/i.test(String(error?.message || ''));
+
 async function loadProducts(sb) {
   let last = null;
   for (const cols of TRIES) {
@@ -34,13 +40,26 @@ async function loadProducts(sb) {
       return { rows: (res.data || []).map(withThumb), hasFeatured: cols.includes('featured'), error: null };
     }
     last = res.error;
+    if (!missingColumn(res.error)) break; // vraie panne : inutile d'insister
   }
   return { rows: [], hasFeatured: false, error: last };
 }
 
 export default async function ShowcasePage() {
   if (!hasSupabase()) return null;
-  const sb = createAdminClient();
+
+  // hasSupabase() ne vérifie que l'URL et la clé anon ; createAdminClient()
+  // lève une exception si SUPABASE_SERVICE_ROLE_KEY manque. Sans ce garde-fou,
+  // la page renvoyait une erreur 500 au lieu du message d'aide ci-dessous.
+  let sb;
+  try { sb = createAdminClient(); } catch (e) {
+    return (
+      <div className="adm-err" style={{ margin: 16 }}>
+        Clé serveur Supabase absente : renseignez <b>SUPABASE_SERVICE_ROLE_KEY</b> dans les
+        variables d’environnement, puis redéployez. ({e?.message})
+      </div>
+    );
+  }
 
   const [prod, brandsRes, catsRes, picksRes] = await Promise.all([
     loadProducts(sb),

@@ -97,14 +97,19 @@ export async function POST(req) {
     });
   }
 
-  log(sessionId, 'user', message);
+  // `await` volontaire : sur Vercel l'instance peut être gelée dès la réponse
+  // envoyée, et un log non attendu se perdait au hasard.
+  await log(sessionId, 'user', message);
 
   // ---- Mode plateforme externe ---------------------------------------------
   if (cfg.provider !== 'builtin' && cfg.base_url && cfg.widget_key) {
     const upstream = `${String(cfg.base_url).replace(/\/+$/, '')}/api/widget/messages`;
+    // `timeout` est déclaré HORS du try pour pouvoir être annulé dans le catch :
+    // sans cela, un appel en échec laissait un minuteur de 45 s tourner pour rien.
+    let timeout;
     try {
       const ctrl = new AbortController();
-      const timeout = setTimeout(() => ctrl.abort(), 45000);
+      timeout = setTimeout(() => ctrl.abort(), 45000);
       const res = await fetch(upstream, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -122,7 +127,7 @@ export async function POST(req) {
         // La plateforme est là mais refuse : on ne montre pas d'erreur brute au
         // visiteur, l'assistant intégré répond à partir du catalogue.
         const fb = await answer(message, lang);
-        log(sessionId, 'assistant', fb.text);
+        await log(sessionId, 'assistant', fb.text);
         return new Response(streamText(fb.text, { products: fb.products, source: `fallback:http_${res.status}` }), { headers: SSE_HEADERS });
       }
 
@@ -135,7 +140,9 @@ export async function POST(req) {
           const { value, done } = await reader.read();
           if (done) {
             clearTimeout(timeout);
-            if (collected) log(sessionId, 'assistant', collected);
+            // Attendu avant close() : sinon l'écriture était coupée par le gel
+            // de l'instance et la conversation n'apparaissait pas dans /admin/ai.
+            if (collected) await log(sessionId, 'assistant', collected);
             controller.close();
             return;
           }
@@ -149,8 +156,9 @@ export async function POST(req) {
       });
       return new Response(stream, { headers: SSE_HEADERS });
     } catch (e) {
+      clearTimeout(timeout);
       const fb = await answer(message, lang);
-      log(sessionId, 'assistant', fb.text);
+      await log(sessionId, 'assistant', fb.text);
       const reason = e?.name === 'AbortError' ? 'timeout' : 'network';
       return new Response(streamText(fb.text, { products: fb.products, source: `fallback:${reason}` }), { headers: SSE_HEADERS });
     }
@@ -158,6 +166,6 @@ export async function POST(req) {
 
   // ---- Mode intégré (catalogue) --------------------------------------------
   const res = await answer(message, lang);
-  log(sessionId, 'assistant', res.text);
+  await log(sessionId, 'assistant', res.text);
   return new Response(streamText(res.text, { products: res.products, source: 'builtin' }), { headers: SSE_HEADERS });
 }

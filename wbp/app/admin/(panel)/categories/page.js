@@ -1,4 +1,5 @@
 import { createAdminClient, hasSupabase } from '@/lib/supabase/server';
+import { selectAll } from '@/lib/queries';
 import CategoriesManager from '@/components/admin/CategoriesManager';
 
 export const dynamic = 'force-dynamic';
@@ -9,7 +10,9 @@ export default async function CategoriesAdmin() {
   const sb = createAdminClient();
   const [{ data: categories }, { data: products }] = await Promise.all([
     sb.from('categories').select('*').order('sort'),
-    sb.from('products').select('cat'),
+    // Paginé : PostgREST s'arrête à 1000 lignes, le catalogue en compte plus —
+    // sinon le « {n} produit(s) » par catégorie est sous-évalué.
+    selectAll(() => sb.from('products').select('cat').order('id')),
   ]);
   const counts = {};
   for (const p of products || []) counts[p.cat] = (counts[p.cat] || 0) + 1;

@@ -1,4 +1,5 @@
 import { createAdminClient, hasSupabase } from '@/lib/supabase/server';
+import { selectAll } from '@/lib/queries';
 import BrandsManager from '@/components/admin/BrandsManager';
 
 export const dynamic = 'force-dynamic';
@@ -9,7 +10,10 @@ export default async function BrandsAdmin() {
   const sb = createAdminClient();
   const [{ data: brands }, { data: products }] = await Promise.all([
     sb.from('brands').select('*').order('sort').order('name'),
-    sb.from('products').select('brand'),
+    // Paginé : PostgREST s'arrête à 1000 lignes, le catalogue en compte plus.
+    // Sans cela une marque pouvait afficher « 0 produit(s) » et sembler
+    // supprimable sans risque.
+    selectAll(() => sb.from('products').select('brand').order('id')),
   ]);
   // Nombre de produits par marque : sert à afficher l'usage et à bloquer une
   // suppression qui casserait le catalogue.

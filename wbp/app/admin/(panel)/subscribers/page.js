@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { createAdminClient, hasSupabase } from '@/lib/supabase/server';
+import { selectAll } from '@/lib/queries';
 import { DeleteBtn } from '@/components/admin/controls';
 import { SITE } from '@/lib/site';
 
@@ -32,10 +33,14 @@ export default async function Subscribers({ searchParams }) {
   const status = STATUSES.includes(sp.status) ? sp.status : '';
   const sb = createAdminClient();
 
-  let query = sb.from('newsletter_subscribers').select('*').eq('site', SITE).order('created_at', { ascending: false }).limit(2000);
-  if (status) query = query.eq('status', status);
-  if (q) query = query.ilike('email', `%${q}%`);
-  const { data } = await query;
+  // Paginé : PostgREST plafonne chaque réponse à 1000 lignes — le tableau
+  // affichait 1000 abonnés sous un total de plusieurs milliers, sans rien dire.
+  const { data } = await selectAll(() => {
+    let query = sb.from('newsletter_subscribers').select('*').eq('site', SITE);
+    if (status) query = query.eq('status', status);
+    if (q) query = query.ilike('email', `%${q}%`);
+    return query.order('created_at', { ascending: false }).order('id');
+  });
 
   const counts = {};
   await Promise.all(STATUSES.map(async (st) => {
@@ -57,7 +62,7 @@ export default async function Subscribers({ searchParams }) {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
         <div>
           <h1 className="adm-h1">Newsletter — abonnés</h1>
-          <p className="adm-sub">{total} au total · {counts.subscribed} actif(s)</p>
+          <p className="adm-sub">{total} au total · {counts.subscribed} actif(s){(status || q) ? ` · ${data?.length || 0} affiché(s)` : ''}</p>
         </div>
         <a className="adm-btn" href="/api/admin/subscribers-export">Exporter CSV</a>
       </div>

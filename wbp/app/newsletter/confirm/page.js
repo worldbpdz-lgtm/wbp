@@ -15,7 +15,9 @@ export default async function ConfirmPage({ searchParams }) {
   const c = COPY[lang];
   const dir = lang === 'ar' ? 'rtl' : 'ltr';
   const res = await confirmSubscription(sp?.token);
-  const ok = res.ok && (res.email || res.stored === false);
+  // Succès uniquement si une adresse a réellement été confirmée : un jeton
+  // invalide ne doit jamais afficher la page de succès.
+  const ok = !!(res.ok && res.email);
   return ok
     ? <NewsletterResult tone="ok" icon="✓" title={c.ok_t} message={c.ok_m} ctaHref="/catalog" ctaLabel={c.cta} dir={dir} />
     : <NewsletterResult tone="error" icon="!" title={c.bad_t} message={c.bad_m} ctaHref="/" ctaLabel={c.cta} dir={dir} />;

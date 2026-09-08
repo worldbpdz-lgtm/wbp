@@ -111,7 +111,13 @@ export async function subscribeNewsletter(email, lang = 'fr') {
   const subject = L === 'ar' ? 'أكد اشتراكك — World Business Plus'
     : L === 'en' ? 'Confirm your subscription — World Business Plus'
     : 'Confirmez votre inscription — World Business Plus';
-  await sendEmail({ to: e, subject, html: confirmEmailHtml({ confirmUrl, lang: L }) });
+  // Le résultat de l'envoi était ignoré : on annonçait « vérifiez votre boîte
+  // mail » même quand aucun message n'était parti.
+  const sent = await sendEmail({ to: e, subject, html: confirmEmailHtml({ confirmUrl, lang: L }) });
+  if (!sent.ok) {
+    console.error('[subscribeNewsletter] envoi échoué:', sent.error);
+    return { ok: false, error: 'Inscription enregistrée, mais l\'e-mail de confirmation n\'a pas pu être envoyé. Réessayez plus tard.' };
+  }
   return { ok: true, stored: true, pending: true };
 }
 
@@ -156,11 +162,16 @@ function parseDevice(ua = '') {
 export async function trackEvent({ type, path, productId, sessionId } = {}) {
   try {
     if (!hasSupabase()) return { ok: true, stored: false };
-    // Un visiteur normal génère quelques vues par minute. Sans plafond, cette
-    // action laissait n'importe qui gonfler la table `events` indéfiniment et
-    // fausser toutes les statistiques de /admin/analytics.
-    const limited = await guard('track', { limit: 60, windowMs: 60_000 });
-    if (limited) return { ok: false, stored: false };
+    // Plafond PAR VISITEUR (sessionId), pas par adresse IP : derrière le NAT
+    // d'une entreprise ou d'un opérateur mobile, des centaines de visiteurs
+    // partagent une seule IP et un plafond par IP les couperait tous, ce qui
+    // fausserait les statistiques au lieu de les protéger. Un visiteur sans
+    // sessionId retombe sur l'IP, avec un plafond large.
+    const sid = str(sessionId, 60);
+    const limited = sid
+      ? await guard('track', { limit: 40, windowMs: 60_000, subject: sid })
+      : await guard('track-ip', { limit: 600, windowMs: 60_000 });
+    if (limited) return { ok: false, stored: false, rateLimited: true };
     const t = type === 'product_view' ? 'product_view' : 'page_view';
     const { headers } = await import('next/headers');
     const h = await headers();

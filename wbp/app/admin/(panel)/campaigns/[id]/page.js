@@ -10,7 +10,9 @@ export default async function CampaignPage({ params }) {
   if (!hasSupabase()) return null;
   const { id } = await params;
   const sb = createAdminClient();
-  const { data: c } = await sb.from('email_campaigns').select('*').eq('id', id).maybeSingle();
+  // La base est partagée entre les deux sites : sans ce filtre, l'administrateur
+  // d'un site pouvait ouvrir la campagne de l'autre en devinant son identifiant.
+  const { data: c } = await sb.from('email_campaigns').select('*').eq('site', SITE).eq('id', id).maybeSingle();
   if (!c) notFound();
 
   const [sentR, openR, clickR, audienceR] = await Promise.all([

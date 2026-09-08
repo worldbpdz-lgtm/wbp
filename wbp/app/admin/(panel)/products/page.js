@@ -5,6 +5,11 @@ import { ToggleActive, ToggleFeatured, DeleteBtn } from '@/components/admin/cont
 export const dynamic = 'force-dynamic';
 const PER = 50;
 const dz = (n) => n == null ? '—' : new Intl.NumberFormat('fr-DZ').format(n) + ' DA';
+// Dans la grammaire `or(...)` de PostgREST, « , ) ( . » sont structurels : une
+// référence contenant une virgule ou une parenthèse produisait un filtre
+// invalide (et donc un tableau vide). On entoure la valeur de guillemets
+// doubles, en échappant les guillemets et antislashs internes.
+const orLit = (v) => `"${String(v).replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
 
 export default async function ProductsAdmin({ searchParams }) {
   if (!hasSupabase()) return null;
@@ -15,14 +20,15 @@ export default async function ProductsAdmin({ searchParams }) {
   const sb = createAdminClient();
 
   let query = sb.from('products').select('*', { count: 'exact' });
-  if (q) query = query.or(`name.ilike.%${q}%,code.ilike.%${q}%`);
+  if (q) { const like = orLit(`%${q}%`); query = query.or(`name.ilike.${like},code.ilike.${like}`); }
   if (filter === 'active') query = query.eq('active', true);
   if (filter === 'hidden') query = query.eq('active', false);
   if (filter === 'featured') query = query.eq('featured', true);
-  const { data: products, count } = await query.order('active', { ascending: false }).order('sort').range((page - 1) * PER, page * PER - 1);
-  // Les produits mis en avant remontent en tête de page (tri en mémoire pour
-  // rester compatible tant que la migration featured.sql n'est pas appliquée).
-  (products || []).sort((a, b) => (b.featured ? 1 : 0) - (a.featured ? 1 : 0));
+  // Les produits mis en avant remontent en tête : tri fait par la base, sinon
+  // il ne porterait que sur les 50 lignes de la page courante.
+  const { data: products, count, error } = await query
+    .order('featured', { ascending: false }).order('active', { ascending: false }).order('sort').order('id')
+    .range((page - 1) * PER, page * PER - 1);
   const { data: brands } = await sb.from('brands').select('id,name');
   const bmap = Object.fromEntries((brands || []).map((b) => [b.id, b.name]));
   const total = count || 0; const pages = Math.max(1, Math.ceil(total / PER));
@@ -31,7 +37,7 @@ export default async function ProductsAdmin({ searchParams }) {
   return (
     <>
       <div className="adm-head">
-        <div><h1 className="adm-h1">Produits</h1><p className="adm-sub">{total} produit(s){filter !== 'all' ? ` · ${{ active: 'visibles', hidden: 'masqués', featured: 'mis en avant' }[filter] || filter}` : ''}{q ? ` · recherche « ${q} »` : ''}. L’étoile ★ met un produit en avant : il apparaît en premier dans le catalogue.</p></div>
+        <div><h1 className="adm-h1">Produits</h1><p className="adm-sub">{error ? 'Liste indisponible — voir le message ci-dessous.' : <>{total} produit(s){filter !== 'all' ? ` · ${{ active: 'visibles', hidden: 'masqués', featured: 'mis en avant' }[filter] || filter}` : ''}{q ? ` · recherche « ${q} »` : ''}. L’étoile ★ met un produit en avant : il apparaît en premier dans le catalogue.</>}</p></div>
         <Link className="adm-btn primary" href="/admin/products/new">+ Nouveau produit</Link>
       </div>
 
@@ -46,6 +52,13 @@ export default async function ProductsAdmin({ searchParams }) {
         <button className="adm-btn primary" type="submit">Filtrer</button>
         {(q || filter !== 'all') && <Link className="adm-btn" href="/admin/products">Réinitialiser</Link>}
       </form>
+
+      {error && (
+        <div className="adm-err">
+          La liste n’a pas pu être chargée{q ? ` pour la recherche « ${q} »` : ''} : {error.message || 'erreur inconnue'}.
+          {q ? ' Essayez une recherche sans caractères spéciaux, ou réinitialisez le filtre.' : ' Réessayez dans un instant.'}
+        </div>
+      )}
 
       <div className="adm-panel">
         <table className="adm-table">

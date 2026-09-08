@@ -303,18 +303,33 @@ function ReviewForm({ onSubmit, onCancel }) {
   const [title, setTitle] = React.useState('');
   const [body, setBody] = React.useState('');
   const [author, setAuthor] = React.useState('');
+  const [website, setWebsite] = React.useState('');   // piège à robots (honeypot)
+  // Sans ce verrou, un double-clic envoyait deux fois l'avis et consommait le
+  // quota anti-spam : le visiteur voyait « trop de tentatives » au lieu du merci.
+  const [sending, setSending] = React.useState(false);
   const valid = body.trim().length > 4 && author.trim().length > 1;
+  const send = async (e) => {
+    e.preventDefault();
+    if (!valid || sending) return;
+    setSending(true);
+    try { await onSubmit({ rating, title: title.trim(), body: body.trim(), author: author.trim(), website }); }
+    finally { setSending(false); }
+  };
   return (
-    <form className="rv-form" onSubmit={(e) => { e.preventDefault(); if (valid) onSubmit({ rating, title: title.trim(), body: body.trim(), author: author.trim() }); }}>
+    <form className="rv-form" onSubmit={send}>
       <div className="rv-form-rate"><span>{t('your_rating')}</span><Stars value={rating} size={26} onPick={setRating} /></div>
       <div className="rv-form-grid">
         <input className="rv-input" placeholder={t('your_name')} value={author} onChange={(e) => setAuthor(e.target.value)} />
         <input className="rv-input" placeholder={t('review_title_ph')} value={title} onChange={(e) => setTitle(e.target.value)} />
       </div>
       <textarea className="rv-input rv-textarea" placeholder={t('review_body_ph')} value={body} onChange={(e) => setBody(e.target.value)} rows={4} />
+      {/* Champ piège : masqué aux humains, aux lecteurs d'écran et à l'auto-remplissage. */}
+      <div aria-hidden="true" style={{ position: 'absolute', left: '-9999px', width: 1, height: 1, overflow: 'hidden' }}>
+        <input type="text" name="website" tabIndex={-1} autoComplete="off" value={website} onChange={(e) => setWebsite(e.target.value)} />
+      </div>
       <div className="rv-form-actions">
         <Btn variant="ghost" onClick={onCancel} type="button">{t('clear')}</Btn>
-        <button className="btn btn-primary btn-md" type="submit" disabled={!valid}>{t('submit_review')}</button>
+        <button className="btn btn-primary btn-md" type="submit" disabled={!valid || sending}>{sending ? '…' : t('submit_review')}</button>
       </div>
     </form>
   );
@@ -323,16 +338,17 @@ function ReviewForm({ onSubmit, onCancel }) {
 function ReviewSystem({ product, initialReviews }) {
   const { t } = useApp();
   const base = initialReviews || [];
-  const [extra, setExtra] = React.useState([]);
   const [helpful, setHelpful] = React.useState({});
   const [filter, setFilter] = React.useState(0);
   const [sort, setSort] = React.useState('recent');
   const [showForm, setShowForm] = React.useState(false);
   const [thanks, setThanks] = React.useState(false);
+  const [err, setErr] = React.useState('');
 
-  React.useEffect(() => { setExtra([]); setHelpful({}); setFilter(0); setShowForm(false); setThanks(false); }, [product.id]);
+  React.useEffect(() => { setHelpful({}); setFilter(0); setShowForm(false); setThanks(false); setErr(''); }, [product.id]);
 
-  const all = [...extra, ...base];
+  // L'avis n'apparaît publiquement qu'après validation : rien n'est ajouté ici.
+  const all = base;
   const dist = [5, 4, 3, 2, 1].map((s) => all.filter((r) => Math.round(r.rating) === s).length);
   const total = all.length || product.reviews;
   const avg = all.length ? all.reduce((a, r) => a + r.rating, 0) / all.length : product.rating;
@@ -347,9 +363,12 @@ function ReviewSystem({ product, initialReviews }) {
   view = [...view].sort(sorters[sort]);
 
   const submit = async (rev) => {
-    setExtra((e) => [{ ...rev, _id: 'u' + Date.now(), date: new Date().toISOString().slice(0, 10), helpful: 0, verified: false }, ...e]);
+    setErr('');
+    let res = null;
+    // L'action renvoie { ok:false, error } — elle ne lève pas d'exception.
+    try { res = await submitReview({ ...rev, product_id: product.id }); } catch { setErr(t('form_error')); return; }
+    if (!res?.ok) { setErr(res?.error && res.error !== 'invalid' ? res.error : t('form_invalid')); return; }
     setShowForm(false); setThanks(true); setTimeout(() => setThanks(false), 4000);
-    try { await submitReview({ ...rev, product_id: product.id }); } catch { /* optimistic; ignore */ }
   };
 
   return (
@@ -393,6 +412,7 @@ function ReviewSystem({ product, initialReviews }) {
             </div>
           </div>
           {thanks && <div className="rv-thanks"><Icon name="check" size={16} /> {t('review_thanks')}</div>}
+          {err && <p style={{ color: '#e5484d', fontSize: 13, padding: '4px 2px' }}>{err}</p>}
           {showForm && <ReviewForm onSubmit={submit} onCancel={() => setShowForm(false)} />}
           <div className="rv-list">
             {view.length === 0 && <p className="sec-sub" style={{ padding: '8px 2px' }}>{t('reviews_sub')} 0 {t('reviews')}.</p>}

@@ -8,6 +8,9 @@ import { CONTACT } from '@/lib/config';
 export default function Footer() {
   const { t, lang, nav, wbp, settings, theme } = useApp();
   const [sub, setSub] = useState(false);
+  const [already, setAlready] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [err, setErr] = useState('');
   const [email, setEmail] = useState('');
   return (
     <footer className="ftr">
@@ -42,17 +45,25 @@ export default function Footer() {
             <h4>{t('foot_newsletter')}</h4>
             <p>{t('foot_news_sub')}</p>
             {sub ? (
-              <p className="ftr-news-ok"><Icon name="check" size={15} /> {t('foot_check_email')}</p>
+              <p className="ftr-news-ok"><Icon name="check" size={15} /> {already ? t('nl_already') : t('foot_check_email')}</p>
             ) : (
               <form className="ftr-form" onSubmit={async (e) => {
                 e.preventDefault();
-                try { await subscribeNewsletter(email, lang); } catch { /* ignore */ }
-                setSub(true);
+                if (sending) return;
+                setSending(true); setErr('');
+                try {
+                  // L'action renvoie { ok:false, error } — elle ne lève pas d'exception.
+                  const r = await subscribeNewsletter(email, lang);
+                  if (r?.ok) { setAlready(!!r.already); setSub(true); }
+                  else setErr(r?.error && r.error !== 'invalid' ? r.error : t('nl_err'));
+                } catch { setErr(t('nl_err')); }
+                finally { setSending(false); }
               }}>
                 <input type="email" required placeholder="email@exemple.dz" value={email} onChange={(e) => setEmail(e.target.value)} />
-                <button type="submit">{t('foot_sub')}</button>
+                <button type="submit" disabled={sending}>{sending ? '…' : t('foot_sub')}</button>
               </form>
             )}
+            {!sub && err && <p className="nl-err">{err}</p>}
           </div>
         </div>
       </div>

@@ -29,11 +29,17 @@ export default function NewsletterPopup() {
   const cfg = settings?.popup || {};
   const enabled = cfg.enabled !== false;
   const delay = Math.max(300, Number(cfg.delay) || 2200);
-  const days = Math.max(0, Number(cfg.days) ?? 7);
+  // `Number(undefined)` vaut NaN, et NaN n'est ni null ni undefined : le `??`
+  // ne rattrapait donc rien et `days` restait NaN quand le réglage était absent.
+  // La comparaison `Date.now() - closedAt < NaN` étant toujours fausse, le
+  // pop-up réapparaissait à CHAQUE visite malgré la fermeture par le visiteur.
+  const days = Math.max(0, Number(cfg.days ?? 7) || 0);
 
   const [open, setOpen] = useState(false);
   const [email, setEmail] = useState('');
   const [state, setState] = useState('idle');   // idle | sending | ok | error
+  const [already, setAlready] = useState(false);
+  const [err, setErr] = useState('');
   const card = useRef(null);
   const restoreFocus = useRef(null);
 
@@ -88,14 +94,19 @@ export default function NewsletterPopup() {
     e.preventDefault();
     if (state === 'sending') return;
     setState('sending');
+    setErr('');
     try {
+      // L'action renvoie { ok:false, error } — elle ne lève pas d'exception.
       const r = await subscribeNewsletter(email, lang);
       if (r?.ok) {
+        setAlready(!!r.already);
         setState('ok');
-        writeState({ ...readState(), subscribed: true, closedAt: Date.now() });
+        // On ne mémorise l'inscription que si elle a réellement eu lieu.
+        if (r.pending || r.already) writeState({ ...readState(), subscribed: true, closedAt: Date.now() });
+        else writeState({ ...readState(), closedAt: Date.now() });
         setTimeout(() => close(false), 3800);
-      } else setState('error');
-    } catch { setState('error'); }
+      } else { setErr(r?.error && r.error !== 'invalid' ? r.error : t('nl_err')); setState('error'); }
+    } catch { setErr(t('nl_err')); setState('error'); }
   };
 
   if (!open) return null;
@@ -130,7 +141,7 @@ export default function NewsletterPopup() {
             <div className="nlpop-done">
               <span className="nlpop-done-ic"><Icon name="check" size={30} /></span>
               <h3>{t('foot_subscribed')}</h3>
-              <p>{t('foot_check_email')}</p>
+              <p>{already ? t('nl_already') : t('foot_check_email')}</p>
               <button className="btn btn-primary btn-md" onClick={() => close(false)}>{t('explore')}</button>
             </div>
           ) : (
@@ -160,7 +171,7 @@ export default function NewsletterPopup() {
                   <span>{state === 'sending' ? '…' : pick(cfg.cta, t('foot_sub'))}</span>
                   <Icon name="arrow" size={17} />
                 </button>
-                {state === 'error' && <span className="nlpop-err">{t('nl_err')}</span>}
+                {state === 'error' && <span className="nlpop-err">{err || t('nl_err')}</span>}
               </form>
 
               <div className="nlpop-foot">

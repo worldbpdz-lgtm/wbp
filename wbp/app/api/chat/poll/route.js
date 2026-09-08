@@ -8,6 +8,7 @@
 // liste vide (le chat n'interroge alors plus rien).
 // ============================================================================
 import { getAiConfig } from '@/lib/queries';
+import { hit } from '@/lib/ratelimit';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -17,6 +18,16 @@ const json = (obj, status = 200) => new Response(JSON.stringify(obj), {
 });
 
 export async function GET(req) {
+  // Comme /api/chat : point d'entrée public qui déclenche une lecture en base
+  // et un appel sortant vers la plateforme externe à CHAQUE requête. Le budget
+  // est plus large car le chat interroge cette route en boucle pendant qu'une
+  // conversation est ouverte.
+  const ip = (req.headers.get('x-forwarded-for') || '').split(',')[0].trim()
+    || req.headers.get('x-real-ip') || 'local';
+  if (!hit(`poll:${ip}`, 240, 60_000).ok) {
+    return json({ messages: [], aiActive: true, rateLimited: true }, 429);
+  }
+
   const url = new URL(req.url);
   const conversationId = (url.searchParams.get('conversationId') || '').slice(0, 80);
   const sessionId = (url.searchParams.get('sessionId') || '').slice(0, 80);

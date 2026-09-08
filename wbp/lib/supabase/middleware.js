@@ -41,7 +41,11 @@ export async function updateSession(request) {
 
   // getUser() valide le jeton auprès de Supabase (contrairement à getSession(),
   // qui se contente de lire un cookie que le client contrôle).
-  const { data: { user } } = await supabase.auth.getUser();
+  // Si Supabase est injoignable (projet en pause, réseau coupé), la promesse
+  // est rejetée : sans ce garde-fou, l'exception remontait et TOUTE page
+  // /admin renvoyait une erreur 500 au lieu de la page de connexion.
+  const { data } = await supabase.auth.getUser().catch(() => ({ data: null }));
+  const user = data?.user ?? null;
 
   if (isAdminArea && !path.startsWith('/admin/login')) {
     if (!user || !isAdminEmail(user.email)) {
@@ -49,7 +53,15 @@ export async function updateSession(request) {
       u.pathname = '/admin/login';
       u.searchParams.set('next', path);
       if (user) u.searchParams.set('denied', '1');
-      return NextResponse.redirect(u);
+      // On repart d'une réponse neuve : il faut donc y recopier les cookies
+      // d'authentification que Supabase vient éventuellement de renouveler
+      // (sinon un jeton rafraîchi est perdu et l'utilisateur boucle sur la
+      // page de connexion), ainsi que les en-têtes anti-indexation.
+      const redirect = NextResponse.redirect(u);
+      res.cookies.getAll().forEach((c) => redirect.cookies.set(c));
+      redirect.headers.set('X-Robots-Tag', 'noindex, nofollow, noarchive');
+      redirect.headers.set('Cache-Control', 'no-store, max-age=0');
+      return redirect;
     }
   }
   return res;

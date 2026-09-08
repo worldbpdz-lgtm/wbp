@@ -23,6 +23,10 @@ export const metadata = { title: 'Admin — Nouveautés' };
 const BASE = 'id,name,code,cat,brand,image_url,active,badge';
 const TRIES = [`${BASE},images`, BASE, 'id,name,code,cat,brand,image_url,active'];
 
+// Voir showcase/page.js : on ne dégrade que sur une erreur « colonne inconnue ».
+const missingColumn = (error) => error?.code === 'PGRST204'
+  || /column .* does not exist|could not find the .* column/i.test(String(error?.message || ''));
+
 async function loadProducts(sb) {
   let last = null;
   for (const cols of TRIES) {
@@ -31,13 +35,25 @@ async function loadProducts(sb) {
       return { rows: (res.data || []).map(withThumb), hasBadge: cols.includes('badge'), error: null };
     }
     last = res.error;
+    if (!missingColumn(res.error)) break;
   }
   return { rows: [], hasBadge: false, error: last };
 }
 
 export default async function ArrivalsPage() {
   if (!hasSupabase()) return null;
-  const sb = createAdminClient();
+
+  // Voir showcase/page.js : createAdminClient() lève si la clé service_role
+  // manque, ce qui produisait une erreur 500 au lieu d'un message clair.
+  let sb;
+  try { sb = createAdminClient(); } catch (e) {
+    return (
+      <div className="adm-err" style={{ margin: 16 }}>
+        Clé serveur Supabase absente : renseignez <b>SUPABASE_SERVICE_ROLE_KEY</b> dans les
+        variables d’environnement, puis redéployez. ({e?.message})
+      </div>
+    );
+  }
 
   const [prod, brandsRes, catsRes, picksRes] = await Promise.all([
     loadProducts(sb),

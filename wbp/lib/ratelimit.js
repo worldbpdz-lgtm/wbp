@@ -59,10 +59,18 @@ export async function clientIp() {
   } catch { return 'local'; }
 }
 
-/** Raccourci pour les server actions : renvoie null si autorisé, sinon l'erreur. */
-export async function guard(action, { limit = 5, windowMs = 60_000 } = {}) {
-  const ip = await clientIp();
-  const { ok, retryAfter } = hit(`${action}:${ip}`, limit, windowMs);
+/**
+ * Raccourci pour les server actions : renvoie null si autorisé, sinon l'erreur.
+ *
+ * `subject` permet de compter par visiteur plutôt que par adresse IP. C'est
+ * indispensable pour les statistiques : derrière le NAT d'une entreprise, d'une
+ * école ou d'un opérateur mobile algérien, des centaines de visiteurs partagent
+ * UNE seule adresse IP — un plafond par IP les ferait tomber tous ensemble et
+ * fausserait justement les chiffres qu'il est censé protéger.
+ */
+export async function guard(action, { limit = 5, windowMs = 60_000, subject = null } = {}) {
+  const who = subject ? `s:${String(subject).slice(0, 80)}` : await clientIp();
+  const { ok, retryAfter } = hit(`${action}:${who}`, limit, windowMs);
   if (ok) return null;
   return {
     ok: false,

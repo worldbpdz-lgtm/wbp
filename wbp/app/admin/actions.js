@@ -75,7 +75,9 @@ async function upsertTolerant(sb, table, row, onConflict, optional) {
     delete attempt[miss];
     dropped.push(miss);
   }
-  return { error: null, dropped };
+  // Toutes les colonnes optionnelles ont été retirées et l'upsert échoue encore :
+  // on remonte l'échec plutôt que d'annoncer un succès imaginaire.
+  return { error: new Error('Enregistrement impossible.'), dropped };
 }
 
 // ---------- Products ----------
@@ -142,11 +144,20 @@ export async function toggleProductFeatured(id, featured) {
   const pid = s(id, 60);
   const { error } = await sb.from('products').update({ featured: !!featured }).eq('id', pid);
   if (error) return { ok: false, error: friendly(error, 'Ce produit') };
-  // On garde la vitrine cohérente avec l'étoile ★ (si la table existe).
-  try {
-    if (featured) await addToShowcase(pid);
-    else await sb.from('featured_picks').delete().eq('site', SITE).eq('product_id', pid);
-  } catch { /* table absente : la colonne `featured` suffit */ }
+  // On garde la vitrine cohérente avec l'étoile ★. Les erreurs « table absente »
+  // sont tolérées (la colonne `featured` suffit alors), mais une vraie erreur
+  // d'écriture doit remonter au lieu d'être avalée.
+  if (featured) {
+    const { data: last } = await sb.from('featured_picks').select('rank')
+      .eq('site', SITE).order('rank', { ascending: false }).limit(1).maybeSingle();
+    const { error: addErr } = await sb.from('featured_picks')
+      .upsert({ site: SITE, product_id: pid, rank: (last?.rank ?? -1) + 1 }, { onConflict: 'site,product_id' });
+    if (addErr && !missingTable(addErr)) return { ok: false, error: friendly(addErr, 'La vitrine') };
+  } else {
+    const { error: delErr } = await sb.from('featured_picks')
+      .delete().eq('site', SITE).eq('product_id', pid);
+    if (delErr && !missingTable(delErr)) return { ok: false, error: friendly(delErr, 'La vitrine') };
+  }
   revalidatePath('/admin/products'); revalidatePath('/admin/showcase'); revalidatePath('/', 'layout');
   return { ok: true };
 }
@@ -191,7 +202,11 @@ export async function deleteBrand(id) {
   await requireAdmin();
   const sb = createAdminClient();
   const bid = s(id, 60);
-  const { count } = await sb.from('products').select('id', { count: 'exact', head: true }).eq('brand', bid);
+  // Si ce comptage échoue, `count` vaut null et le garde-fou disparaissait en
+  // silence — la marque était supprimée alors que des produits l'utilisent.
+  const { count, error: countErr } = await sb.from('products')
+    .select('id', { count: 'exact', head: true }).eq('brand', bid);
+  if (countErr) return { ok: false, error: friendly(countErr, 'Cette marque') };
   if (count) {
     return { ok: false, error: `Impossible : ${count} produit(s) utilisent encore cette marque. Changez leur marque d'abord.` };
   }
@@ -235,7 +250,9 @@ export async function deleteCategory(id) {
   await requireAdmin();
   const sb = createAdminClient();
   const cid = s(id, 60);
-  const { count } = await sb.from('products').select('id', { count: 'exact', head: true }).eq('cat', cid);
+  const { count, error: countErr } = await sb.from('products')
+    .select('id', { count: 'exact', head: true }).eq('cat', cid);
+  if (countErr) return { ok: false, error: friendly(countErr, 'Cette catégorie') };
   if (count) {
     return { ok: false, error: `Impossible : ${count} produit(s) sont encore dans cette catégorie. Déplacez-les d'abord.` };
   }
@@ -246,40 +263,59 @@ export async function deleteCategory(id) {
 }
 
 // ---------- Leads / moderation ----------
+// Ces actions ignoraient l'erreur renvoyée par Supabase et répondaient
+// TOUJOURS { ok: true } : approuver un avis, changer un statut ou supprimer une
+// ligne semblait réussir même quand rien n'avait été écrit. Chacune vérifie
+// désormais le résultat et renvoie un message lisible.
+async function mutate(run, paths, what) {
+  const { error } = await run();
+  if (error) return { ok: false, error: friendly(error, what) };
+  paths.forEach((p) => revalidatePath(p));
+  return { ok: true };
+}
+
+// NOTE : chaque requête est limitée au site courant (`.eq('site', SITE)`).
+// La base est partagée avec Central Network : sans ce filtre, un identifiant
+// deviné suffisait à modifier ou supprimer les devis, messages, avis et abonnés
+// de l'autre site.
 export async function updateQuoteStatus(id, status) {
   await requireAdmin(); const sb = createAdminClient();
-  await sb.from('quote_requests').update({ status: s(status, 30) }).eq('id', id);
-  revalidatePath('/admin/quotes'); revalidatePath('/admin'); return { ok: true };
+  return mutate(() => sb.from('quote_requests').update({ status: s(status, 30) }).eq('id', id).eq('site', SITE),
+    ['/admin/quotes', '/admin'], 'Cette demande');
 }
 export async function deleteQuote(id) {
   await requireAdmin(); const sb = createAdminClient();
-  await sb.from('quote_requests').delete().eq('id', id);
-  revalidatePath('/admin/quotes'); revalidatePath('/admin'); return { ok: true };
+  return mutate(() => sb.from('quote_requests').delete().eq('id', id).eq('site', SITE),
+    ['/admin/quotes', '/admin'], 'Cette demande');
 }
 export async function updateMessageStatus(id, status) {
   await requireAdmin(); const sb = createAdminClient();
-  await sb.from('contact_messages').update({ status: s(status, 30) }).eq('id', id);
-  revalidatePath('/admin/messages'); revalidatePath('/admin'); return { ok: true };
+  return mutate(() => sb.from('contact_messages').update({ status: s(status, 30) }).eq('id', id).eq('site', SITE),
+    ['/admin/messages', '/admin'], 'Ce message');
 }
 export async function deleteMessage(id) {
   await requireAdmin(); const sb = createAdminClient();
-  await sb.from('contact_messages').delete().eq('id', id);
-  revalidatePath('/admin/messages'); revalidatePath('/admin'); return { ok: true };
+  return mutate(() => sb.from('contact_messages').delete().eq('id', id).eq('site', SITE),
+    ['/admin/messages', '/admin'], 'Ce message');
 }
 export async function setReviewApproved(id, approved) {
   await requireAdmin(); const sb = createAdminClient();
-  await sb.from('reviews').update({ approved }).eq('id', id);
-  revalidatePath('/admin/reviews'); return { ok: true };
+  // Un avis publié apparaît aussitôt sur la fiche produit : on revalide aussi
+  // les pages publiques.
+  const res = await mutate(() => sb.from('reviews').update({ approved: !!approved }).eq('id', id).eq('site', SITE),
+    ['/admin/reviews', '/admin'], 'Cet avis');
+  if (res.ok) revalidatePath('/', 'layout');
+  return res;
 }
 export async function deleteReview(id) {
   await requireAdmin(); const sb = createAdminClient();
-  await sb.from('reviews').delete().eq('id', id);
-  revalidatePath('/admin/reviews'); return { ok: true };
+  return mutate(() => sb.from('reviews').delete().eq('id', id).eq('site', SITE),
+    ['/admin/reviews', '/admin'], 'Cet avis');
 }
 export async function deleteSubscriber(id) {
   await requireAdmin(); const sb = createAdminClient();
-  await sb.from('newsletter_subscribers').delete().eq('id', id);
-  revalidatePath('/admin/subscribers'); return { ok: true };
+  return mutate(() => sb.from('newsletter_subscribers').delete().eq('id', id).eq('site', SITE),
+    ['/admin/subscribers', '/admin'], 'Cet abonné');
 }
 
 // ---------- Settings & clients ----------
@@ -287,7 +323,7 @@ export async function saveSetting(key, value) {
   await requireAdmin();
   const sb = createAdminClient();
   const { error } = await sb.from('settings').upsert({ site: SITE, key: s(key, 60), value, updated_at: new Date().toISOString() }, { onConflict: 'site,key' });
-  if (error) return { ok: false, error: error.message };
+  if (error) return { ok: false, error: friendly(error, 'Ce réglage') };
   revalidatePath('/admin/settings'); revalidatePath('/', 'layout');
   return { ok: true };
 }
@@ -296,25 +332,37 @@ export async function addClient(name) {
   const nm = s(name, 200); if (!nm) return { ok: false, error: 'Nom requis' };
   const sb = createAdminClient();
   const { error } = await sb.from('clients').insert({ name: nm, sort: 999, site: SITE });
-  if (error) return { ok: false, error: error.message };
+  if (error) return { ok: false, error: friendly(error, 'Ce client') };
   revalidatePath('/admin/settings'); revalidatePath('/', 'layout');
   return { ok: true };
 }
 export async function deleteClient(id) {
   await requireAdmin();
   const sb = createAdminClient();
-  await sb.from('clients').delete().eq('id', id);
-  revalidatePath('/admin/settings'); revalidatePath('/', 'layout');
-  return { ok: true };
+  const res = await mutate(() => sb.from('clients').delete().eq('id', id),
+    ['/admin/settings'], 'Ce client');
+  // La liste des clients est rendue par le layout public : sans le second
+  // argument 'layout', le client supprimé restait affiché sur le site.
+  if (res.ok) revalidatePath('/', 'layout');
+  return res;
 }
 
-// ---------- Email campaigns ----------
+// ============================================================================
+// CAMPAGNES E-MAIL
+// ----------------------------------------------------------------------------
+// La base est partagée avec Central Network. Ces actions ne filtraient PAS sur
+// `site` : l'administrateur d'un site pouvait modifier, supprimer et surtout
+// ENVOYER une campagne appartenant à l'autre site — vers sa propre liste
+// d'abonnés. Chaque requête est désormais limitée au site courant.
+// ============================================================================
 export async function createCampaign() {
   await requireAdmin();
   const sb = createAdminClient();
   const { data, error } = await sb.from('email_campaigns')
     .insert({ subject: 'Nouvelle campagne', body_html: '', site: SITE }).select('id').single();
-  if (error) throw new Error(error.message);
+  // Message lisible plutôt qu'une erreur Postgres brute (masquée en production
+  // par Next en un « digest » opaque, donc indéboguable pour l'admin).
+  if (error) throw new Error(friendly(error, 'Cette campagne'));
   redirect(`/admin/campaigns/${data.id}`);
 }
 
@@ -327,8 +375,9 @@ export async function updateCampaign(id, p) {
     body_html: s(p.body_html, 100000) || '',
     updated_at: new Date().toISOString(),
   };
-  const { error } = await sb.from('email_campaigns').update(row).eq('id', s(id, 60));
-  if (error) return { ok: false, error: error.message };
+  const { error } = await sb.from('email_campaigns').update(row)
+    .eq('id', s(id, 60)).eq('site', SITE);
+  if (error) return { ok: false, error: friendly(error, 'Cette campagne') };
   revalidatePath(`/admin/campaigns/${id}`); revalidatePath('/admin/campaigns');
   return { ok: true };
 }
@@ -336,9 +385,8 @@ export async function updateCampaign(id, p) {
 export async function deleteCampaign(id) {
   await requireAdmin();
   const sb = createAdminClient();
-  await sb.from('email_campaigns').delete().eq('id', s(id, 60));
-  revalidatePath('/admin/campaigns');
-  return { ok: true };
+  return mutate(() => sb.from('email_campaigns').delete().eq('id', s(id, 60)).eq('site', SITE),
+    ['/admin/campaigns'], 'Cette campagne');
 }
 
 function renderCampaignHtml(campaign, { unsubscribeUrl, sendId }) {
@@ -353,7 +401,8 @@ export async function sendTestCampaign(id, email) {
   const to = s(email, 200);
   if (!to || !to.includes('@')) return { ok: false, error: 'E-mail invalide' };
   const sb = createAdminClient();
-  const { data: c } = await sb.from('email_campaigns').select('*').eq('id', s(id, 60)).single();
+  const { data: c } = await sb.from('email_campaigns').select('*')
+    .eq('id', s(id, 60)).eq('site', SITE).maybeSingle();
   if (!c) return { ok: false, error: 'Campagne introuvable' };
   const html = renderCampaignHtml(c, { unsubscribeUrl: `${siteUrl()}/newsletter/unsubscribe?token=TEST`, sendId: null });
   const r = await sendEmail({ to, subject: `[TEST] ${c.subject}`, html });
@@ -364,7 +413,8 @@ export async function sendCampaign(id) {
   await requireAdmin();
   const sb = createAdminClient();
   const cid = s(id, 60);
-  const { data: c } = await sb.from('email_campaigns').select('*').eq('id', cid).single();
+  const { data: c } = await sb.from('email_campaigns').select('*')
+    .eq('id', cid).eq('site', SITE).maybeSingle();
   if (!c) return { ok: false, error: 'Campagne introuvable' };
   if (c.status === 'sent') return { ok: false, error: 'Campagne déjà envoyée' };
   const { data: subs } = await sb.from('newsletter_subscribers')
@@ -429,7 +479,15 @@ async function writeRankedList(sb, table, ids, label) {
   return { ok: true };
 }
 
-/** Synchronise products.featured avec la sélection (tri de secours + étoile ★). */
+/**
+ * Repli pour une base NON migrée : marque la sélection dans products.featured.
+ *
+ * ⚠️ La table `products` est PARTAGÉE entre World Business Plus et Central
+ * Network, et `featured` n'a pas de colonne `site`. Remettre à false tous les
+ * produits marqués effacerait donc aussi la vitrine de l'autre site. On ne
+ * l'appelle QUE si la table featured_picks n'existe pas — dès qu'elle existe,
+ * c'est elle qui porte la vitrine, par site, et cette colonne n'est plus touchée.
+ */
 async function syncFeaturedColumn(sb, ids) {
   const off = await sb.from('products').update({ featured: false }).eq('featured', true);
   if (off.error) return false; // colonne absente : base non migrée
@@ -447,7 +505,8 @@ export async function saveShowcase(productIds) {
   const res = await writeRankedList(sb, 'featured_picks', ids, 'La vitrine');
   if (res.error) return { ok: false, error: res.error };
 
-  const synced = await syncFeaturedColumn(sb, ids);
+  // Uniquement en repli : voir l'avertissement sur syncFeaturedColumn.
+  const synced = res.missing ? await syncFeaturedColumn(sb, ids) : true;
 
   revalidatePath('/admin/showcase'); revalidatePath('/admin/products'); revalidatePath('/', 'layout');
 

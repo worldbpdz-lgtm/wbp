@@ -11,7 +11,16 @@ function Saver({ label, onSave }) {
   const [msg, setMsg] = useState(''); const [busy, setBusy] = useState(false);
   return (
     <div className="adm-actions" style={{ marginTop: 14 }}>
-      <button className="adm-btn primary" disabled={busy} onClick={async () => { setBusy(true); const r = await onSave(); setBusy(false); setMsg(r?.ok ? 'Enregistré ✓' : (r?.error || 'Erreur')); setTimeout(() => setMsg(''), 2500); }}>
+      {/* try/finally : sans lui, une session expirée laissait le bouton bloqué
+          sur « … » indéfiniment, l'erreur n'étant jamais attrapée. */}
+      <button className="adm-btn primary" disabled={busy} onClick={async () => {
+        setBusy(true);
+        let r;
+        try { r = await onSave(); } catch { r = { ok: false, error: 'Session expirée — reconnectez-vous.' }; }
+        finally { setBusy(false); }
+        setMsg(r?.ok ? 'Enregistré ✓' : (r?.error || 'Erreur'));
+        setTimeout(() => setMsg(''), 2500);
+      }}>
         {busy ? '…' : (label || 'Enregistrer')}
       </button>
       {msg && <span className="adm-muted" style={{ alignSelf: 'center' }}>{msg}</span>}
@@ -50,6 +59,8 @@ export default function SettingsManager({ settings, clients }) {
   };
 
   const [newClient, setNewClient] = useState('');
+  const [clientErr, setClientErr] = useState('');
+  const [clientBusy, setClientBusy] = useState(false);
   const refresh = () => router.refresh();
 
   return (
@@ -174,15 +185,31 @@ export default function SettingsManager({ settings, clients }) {
 
       <div className="adm-card-form">
         <h2 style={{ marginTop: 0, fontSize: 16 }}>Clients / références ({clients.length})</h2>
+        {/* Le résultat de addClient / deleteClient était ignoré : un échec
+            vidait quand même le champ et semblait avoir fonctionné. */}
+        {clientErr && <div className="adm-err" style={{ marginBottom: 10 }}>{clientErr}</div>}
         <div className="adm-actions" style={{ marginBottom: 12 }}>
           <input className="adm-form" style={{ padding: '9px 12px', border: '1px solid var(--line)', borderRadius: 11, minWidth: 240 }} value={newClient} onChange={(e) => setNewClient(e.target.value)} placeholder="Nom du client" />
-          <button className="adm-btn primary" onClick={async () => { if (!newClient.trim()) return; await addClient(newClient.trim()); setNewClient(''); refresh(); }}>Ajouter</button>
+          <button className="adm-btn primary" disabled={clientBusy} onClick={async () => {
+            if (!newClient.trim()) return;
+            setClientErr(''); setClientBusy(true);
+            let r; try { r = await addClient(newClient.trim()); } catch { r = { ok: false, error: 'Session expirée — reconnectez-vous.' }; }
+            setClientBusy(false);
+            if (!r?.ok) { setClientErr(r?.error || 'Ajout impossible.'); return; }
+            setNewClient(''); refresh();
+          }}>{clientBusy ? '…' : 'Ajouter'}</button>
         </div>
         <div className="adm-actions">
           {clients.map((cl) => (
             <span key={cl.id} className="adm-tag blue" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '5px 6px 5px 12px' }}>
               {cl.name}
-              <button className="adm-btn sm danger" style={{ padding: '1px 7px' }} onClick={async () => { await deleteClient(cl.id); refresh(); }}>×</button>
+              <button className="adm-btn sm danger" style={{ padding: '1px 7px' }} disabled={clientBusy} onClick={async () => {
+                setClientErr(''); setClientBusy(true);
+                let r; try { r = await deleteClient(cl.id); } catch { r = { ok: false, error: 'Session expirée — reconnectez-vous.' }; }
+                setClientBusy(false);
+                if (!r?.ok) { setClientErr(r?.error || 'Suppression impossible.'); return; }
+                refresh();
+              }}>×</button>
             </span>
           ))}
         </div>

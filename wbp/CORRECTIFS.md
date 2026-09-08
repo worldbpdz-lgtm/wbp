@@ -169,11 +169,50 @@ Upstash Redis (~15 lignes dans `lib/ratelimit.js`).
 
 ---
 
+## 3 bis. Deuxième passe de vérification — 24 défauts supplémentaires
+
+Une relecture ligne par ligne de l'ensemble du code (y compris les fichiers que
+je n'avais pas touchés) a trouvé 24 problèmes de plus. Tous corrigés.
+
+### Régressions que j'avais moi-même introduites
+
+| # | Problème | Correction |
+|---|---|---|
+| 1 | Le message « **Votre avis a été publié** » devenait faux dès lors que la modération était activée — et l'avis était même injecté dans la moyenne des étoiles, puis disparaissait au rechargement. | Message réécrit en FR/EN/AR (« sera publié après vérification »), insertion optimiste supprimée, bouton renommé « Envoyer mon avis ». |
+| 2 | Le **piège à robots ne servait à rien** : aucun formulaire n'envoyait le champ. | Champ caché ajouté aux formulaires devis, contact et avis. |
+| 3 | Les erreurs de **limitation de débit étaient invisibles** : les formulaires affichaient « Message envoyé ✓ » alors que rien n'était parti. | Les 5 formulaires lisent désormais le résultat et affichent l'erreur réelle. |
+| 4 | Le plafond de statistiques **par adresse IP** aurait coupé tout un immeuble ou tout un opérateur mobile derrière un même NAT — faussant les chiffres qu'il devait protéger. | Compté **par visiteur** (sessionId), repli large par IP. |
+| 5 | Le chat affichait « Connexion interrompue » sur une **limite de débit** (HTTP 429). | Message dédié en FR/EN/AR. |
+| 6 | Le filtre `/admin` **plantait en 500** si Supabase était injoignable, et **perdait les cookies d'authentification** lors d'une redirection (boucle de connexion). | Appel protégé, cookies et en-têtes recopiés sur la redirection. |
+| 7 | Les 7 actions d'administration réécrites (devis, messages, avis, abonnés) **ne filtraient pas par site** — un identifiant deviné donnait accès aux données de Central Network. | `.eq('site', SITE)` ajouté partout. |
+| 8 | Enregistrer la vitrine **effaçait les produits mis en avant de l'autre site** (colonne `featured` partagée). | La colonne n'est plus touchée dès que `featured_picks` existe. |
+| 9 | `/api/chat/poll` restait **sans limite de débit**, minuteur de 45 s non annulé, journaux de conversation perdus. | Corrigés. |
+
+### Défauts préexistants trouvés au passage
+
+| # | Problème | Gravité |
+|---|---|---|
+| 10 | **Campagnes e-mail non filtrées par site** : un admin pouvait ouvrir, modifier, supprimer et **envoyer** la campagne de l'autre site à sa propre liste d'abonnés. | Élevée |
+| 11 | 7 actions d'administration **ignoraient l'erreur et répondaient toujours « ok »** : approuver un avis ou supprimer une ligne semblait réussir même quand rien n'était écrit. | Élevée |
+| 12 | Une **session expirée faisait planter la page** au lieu d'afficher un message (aucun try/catch autour des actions). | Élevée |
+| 13 | Le **tableau de bord affichait 1 000 produits au lieu de 1 747** ; les comptes par catégorie, par marque et les statistiques étaient tous faussés par le plafond PostgREST. | Élevée |
+| 14 | Les statistiques lisaient **1 000 événements pris au hasard** (aucun tri) et non les plus récents. | Élevée |
+| 15 | L'**export CSV des abonnés s'arrêtait au 1 000ᵉ** sans le dire. | Élevée |
+| 16 | **Injection de formule CSV** : une adresse commençant par `=` s'exécutait à l'ouverture de l'export dans Excel. | Moyenne |
+| 17 | La **recherche produits cassait** sur une virgule ou une parenthèse et affichait « 0 produit » au lieu d'une erreur. | Moyenne |
+| 18 | Le **pop-up newsletter réapparaissait à chaque visite** malgré sa fermeture (`Number(undefined)` → `NaN`). | Moyenne |
+| 19 | Les pages de confirmation / désinscription affichaient le **succès complet pour un jeton invalide**. | Moyenne |
+| 20 | « Déjà inscrit » affichait quand même « **vérifiez votre boîte mail** » — un e-mail qui n'arrivait jamais. | Moyenne |
+| 21 | L'échec d'envoi de l'e-mail de confirmation était **ignoré**. | Moyenne |
+| 22 | Ajout / suppression d'un client : **échec silencieux** ; bouton d'enregistrement **bloqué sur « … »** en cas de session expirée. | Moyenne |
+| 23 | `/admin/reviews` n'avait **aucun filtre** pour retrouver les avis en attente, et les libellait « Masqué » au lieu de « En attente ». | Moyenne |
+| 24 | `seed.sql` était **devenu incompatible** avec la nouvelle clé primaire `(site, key)`. | Faible |
+
 ## 4. État de vérification
 
 | Élément | Statut |
 |---|---|
-| `npm run build` | ✅ compile, TypeScript OK, 32 routes, proxy actif |
+| `npm run build` | ✅ passé **avant** la 2ᵉ passe · ⚠️ **à relancer** après |
 | `fix-all.sql` sur la production | ✅ exécuté, tous les objets à `OK` |
 | Catalogue public (206 produits + photos) | ✅ vérifié en ligne |
 | Écriture publique en base | ✅ aucune policy |
@@ -181,6 +220,12 @@ Upstash Redis (~15 lignes dans `lib/ratelimit.js`).
 
 ### Reste à faire
 
+0. **Relancer `npm run build`.** La deuxième passe a modifié une trentaine de
+   fichiers APRÈS le dernier build réussi, et l'environnement Linux de la
+   session est tombé en panne (disque plein) — impossible de recompiler ici.
+   Les fichiers ont été relus ligne par ligne (aucune erreur de syntaxe, aucun
+   identifiant indéfini, aucune règle React enfreinte), mais **cela ne remplace
+   pas un vrai build**. À lancer avant tout déploiement.
 1. **Déployer** le code (`git push` ou `vercel --prod`) — la base est déjà
    corrigée, mais les correctifs de sécurité et d'interface sont dans le code.
 2. **Définir `NEXT_PUBLIC_SITE_URL`** dans Vercel → Settings → Environment
