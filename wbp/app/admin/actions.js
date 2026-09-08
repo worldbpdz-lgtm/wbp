@@ -137,27 +137,42 @@ export async function toggleProductActive(id, active) {
   revalidatePath('/admin/products'); revalidatePath('/', 'layout');
   return { ok: true };
 }
-// Mis en avant : le produit remonte en tête du catalogue public.
+// ----------------------------------------------------------------------------
+// Étoile ★ « mis en avant » de la liste des produits.
+// ----------------------------------------------------------------------------
+// La vitrine vit dans `featured_picks`, qui est PAR SITE. La colonne
+// `products.featured`, elle, appartient au catalogue PARTAGÉ avec l'autre site :
+// l'écrire ferait apparaître ou disparaître le produit de la vitrine du voisin.
+// On n'écrit donc `featured_picks`, et on ne retombe sur la colonne partagée
+// que si cette table n'existe pas encore (base non migrée).
+// ----------------------------------------------------------------------------
 export async function toggleProductFeatured(id, featured) {
   await requireAdmin();
   const sb = createAdminClient();
   const pid = s(id, 60);
-  const { error } = await sb.from('products').update({ featured: !!featured }).eq('id', pid);
-  if (error) return { ok: false, error: friendly(error, 'Ce produit') };
-  // On garde la vitrine cohérente avec l'étoile ★. Les erreurs « table absente »
-  // sont tolérées (la colonne `featured` suffit alors), mais une vraie erreur
-  // d'écriture doit remonter au lieu d'être avalée.
+  if (!pid) return { ok: false, error: 'Identifiant manquant.' };
+
+  let missing = false;
   if (featured) {
     const { data: last } = await sb.from('featured_picks').select('rank')
       .eq('site', SITE).order('rank', { ascending: false }).limit(1).maybeSingle();
-    const { error: addErr } = await sb.from('featured_picks')
+    const { error } = await sb.from('featured_picks')
       .upsert({ site: SITE, product_id: pid, rank: (last?.rank ?? -1) + 1 }, { onConflict: 'site,product_id' });
-    if (addErr && !missingTable(addErr)) return { ok: false, error: friendly(addErr, 'La vitrine') };
+    if (error && !missingTable(error)) return { ok: false, error: friendly(error, 'La vitrine') };
+    missing = !!error;
   } else {
-    const { error: delErr } = await sb.from('featured_picks')
+    const { error } = await sb.from('featured_picks')
       .delete().eq('site', SITE).eq('product_id', pid);
-    if (delErr && !missingTable(delErr)) return { ok: false, error: friendly(delErr, 'La vitrine') };
+    if (error && !missingTable(error)) return { ok: false, error: friendly(error, 'La vitrine') };
+    missing = !!error;
   }
+
+  // Repli uniquement (base non migrée) : colonne partagée entre les deux sites.
+  if (missing) {
+    const { error } = await sb.from('products').update({ featured: !!featured }).eq('id', pid);
+    if (error) return { ok: false, error: friendly(error, 'Ce produit') };
+  }
+
   revalidatePath('/admin/products'); revalidatePath('/admin/showcase'); revalidatePath('/', 'layout');
   return { ok: true };
 }
@@ -339,7 +354,7 @@ export async function addClient(name) {
 export async function deleteClient(id) {
   await requireAdmin();
   const sb = createAdminClient();
-  const res = await mutate(() => sb.from('clients').delete().eq('id', id),
+  const res = await mutate(() => sb.from('clients').delete().eq('id', id).eq('site', SITE),
     ['/admin/settings'], 'Ce client');
   // La liste des clients est rendue par le layout public : sans le second
   // argument 'layout', le client supprimé restait affiché sur le site.
@@ -538,7 +553,10 @@ export async function addToShowcase(productId) {
   const { error } = await sb.from('featured_picks')
     .upsert({ site: SITE, product_id: pid, rank: (last?.rank ?? -1) + 1 }, { onConflict: 'site,product_id' });
   if (error && !missingTable(error)) return { ok: false, error: friendly(error, 'La vitrine') };
-  await sb.from('products').update({ featured: true }).eq('id', pid);
+  // products.featured est PARTAGÉ entre les deux sites : on ne l'écrit qu'en
+  // repli, quand featured_picks n'existe pas. Sinon la vitrine d'un site
+  // modifiait l'étoile ★ de l'autre.
+  if (error && missingTable(error)) await sb.from('products').update({ featured: true }).eq('id', pid);
   revalidatePath('/admin/showcase'); revalidatePath('/', 'layout');
   return { ok: true };
 }
@@ -550,7 +568,8 @@ export async function removeFromShowcase(productId) {
   const pid = s(productId, 60);
   const { error } = await sb.from('featured_picks').delete().eq('site', SITE).eq('product_id', pid);
   if (error && !missingTable(error)) return { ok: false, error: friendly(error, 'La vitrine') };
-  await sb.from('products').update({ featured: false }).eq('id', pid);
+  // Colonne partagée : écriture réservée au repli (voir addToShowcase).
+  if (error && missingTable(error)) await sb.from('products').update({ featured: false }).eq('id', pid);
   revalidatePath('/admin/showcase'); revalidatePath('/', 'layout');
   return { ok: true };
 }

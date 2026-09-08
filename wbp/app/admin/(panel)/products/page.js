@@ -1,6 +1,8 @@
 import Link from 'next/link';
 import { createAdminClient, hasSupabase } from '@/lib/supabase/server';
 import { ToggleActive, ToggleFeatured, DeleteBtn } from '@/components/admin/controls';
+import { selectAll } from '@/lib/queries';
+import { SITE } from '@/lib/site';
 
 export const dynamic = 'force-dynamic';
 const PER = 50;
@@ -19,15 +21,21 @@ export default async function ProductsAdmin({ searchParams }) {
   const page = Math.max(1, parseInt(sp?.page, 10) || 1);
   const sb = createAdminClient();
 
+  // ★ « mis en avant » = appartenance à la VITRINE DE CE SITE (featured_picks).
+  // La colonne products.featured appartient au catalogue partagé avec l'autre
+  // site : s'y fier afficherait ici l'étoile du voisin.
+  const picksRes = await selectAll(() => sb.from('featured_picks')
+    .select('product_id').eq('site', SITE).order('product_id'));
+  const picked = new Set((picksRes.data || []).map((r) => r.product_id));
+
   let query = sb.from('products').select('*', { count: 'exact' });
   if (q) { const like = orLit(`%${q}%`); query = query.or(`name.ilike.${like},code.ilike.${like}`); }
   if (filter === 'active') query = query.eq('active', true);
   if (filter === 'hidden') query = query.eq('active', false);
-  if (filter === 'featured') query = query.eq('featured', true);
-  // Les produits mis en avant remontent en tête : tri fait par la base, sinon
-  // il ne porterait que sur les 50 lignes de la page courante.
+  // Le filtre ★ passe par la liste d'identifiants du site (vide = aucun).
+  if (filter === 'featured') query = query.in('id', picked.size ? [...picked] : ['']);
   const { data: products, count, error } = await query
-    .order('featured', { ascending: false }).order('active', { ascending: false }).order('sort').order('id')
+    .order('active', { ascending: false }).order('sort').order('id')
     .range((page - 1) * PER, page * PER - 1);
   const { data: brands } = await sb.from('brands').select('id,name');
   const bmap = Object.fromEntries((brands || []).map((b) => [b.id, b.name]));
@@ -73,10 +81,10 @@ export default async function ProductsAdmin({ searchParams }) {
                 <td className="adm-muted">{dz(p.price)}</td>
                 <td>
                   <span className={`adm-tag ${p.active ? 'ok' : 'gray'}`}>{p.active ? 'Visible' : 'Masqué'}</span>
-                  {p.featured && <span className="adm-tag warn" style={{ marginInlineStart: 6 }}>★ En avant</span>}
+                  {picked.has(p.id) && <span className="adm-tag warn" style={{ marginInlineStart: 6 }}>★ En avant</span>}
                 </td>
                 <td><div className="adm-actions">
-                  <ToggleFeatured id={p.id} featured={!!p.featured} />
+                  <ToggleFeatured id={p.id} featured={picked.has(p.id)} />
                   <Link className="adm-btn sm" href={`/admin/products/${p.id}`}>Éditer</Link>
                   <ToggleActive id={p.id} active={p.active} />
                   <DeleteBtn kind="product" id={p.id} />
