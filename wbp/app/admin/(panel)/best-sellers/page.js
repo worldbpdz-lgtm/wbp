@@ -5,25 +5,24 @@ import { PRODUCT_IMAGES } from '@/lib/product-images.generated';
 import { SITE } from '@/lib/site';
 
 // Même repli que sur le site public : si products.image_url est vide, on
-// utilise la photo livrée dans public/products. Sans cela, cet écran affichait
-// une pastille grise pour la quasi-totalité du catalogue.
+// utilise la photo livrée dans public/products.
 const withThumb = (p) => (p.image_url ? p : { ...p, image_url: (PRODUCT_IMAGES[p.id] || [])[0] || null });
 
 export const dynamic = 'force-dynamic';
-export const metadata = { title: 'Admin — Nouveautés' };
+export const metadata = { title: 'Admin — Meilleures ventes' };
 
 // ----------------------------------------------------------------------------
-// Même écran que la vitrine, mais branché sur la table `new_arrivals`.
-// Si la migration n'a pas encore été appliquée, on affiche un message clair
-// plutôt qu'une page vide, et on propose les produits marqués « Nouveau ».
+// Même écran que la vitrine, mais branché sur la table `best_sellers`.
+// La vitrine (/admin/showcase) ne règle QUE la priorité des produits dans le
+// catalogue ; cette page-ci règle le carrousel « Meilleures ventes » de la
+// page d'accueil. Les deux listes sont indépendantes.
 // ----------------------------------------------------------------------------
-// Même remarque que pour la vitrine : une colonne inconnue fait échouer toute
-// la requête, et PostgREST plafonne à 1000 lignes. On dégrade donc le jeu de
-// colonnes jusqu'à ce que la requête passe, et on pagine.
+// Voir showcase/page.js : une colonne inconnue fait échouer toute la requête,
+// et PostgREST plafonne à 1000 lignes. On dégrade donc le jeu de colonnes
+// jusqu'à ce que la requête passe, et on pagine.
 const BASE = 'id,name,code,cat,brand,image_url,active,badge';
 const TRIES = [`${BASE},images`, BASE, 'id,name,code,cat,brand,image_url,active'];
 
-// Voir showcase/page.js : on ne dégrade que sur une erreur « colonne inconnue ».
 const missingColumn = (error) => error?.code === 'PGRST204'
   || /column .* does not exist|could not find the .* column/i.test(String(error?.message || ''));
 
@@ -40,11 +39,11 @@ async function loadProducts(sb) {
   return { rows: [], hasBadge: false, error: last };
 }
 
-export default async function ArrivalsPage() {
+export default async function BestSellersPage() {
   if (!hasSupabase()) return null;
 
-  // Voir showcase/page.js : createAdminClient() lève si la clé service_role
-  // manque, ce qui produisait une erreur 500 au lieu d'un message clair.
+  // createAdminClient() lève si la clé service_role manque : sans ce garde-fou
+  // la page renvoie une 500 au lieu du message d'aide ci-dessous.
   let sb;
   try { sb = createAdminClient(); } catch (e) {
     return (
@@ -59,7 +58,7 @@ export default async function ArrivalsPage() {
     loadProducts(sb),
     sb.from('brands').select('id,name').order('sort').order('name'),
     sb.from('categories').select('id,name').order('sort'),
-    sb.from('new_arrivals').select('product_id,rank').eq('site', SITE).order('rank'),
+    sb.from('best_sellers').select('product_id,rank').eq('site', SITE).order('rank'),
   ]);
 
   const products = prod.rows;
@@ -68,19 +67,19 @@ export default async function ArrivalsPage() {
   const migrated = !picksRes.error;
   const initial = migrated
     ? (picksRes.data || []).map((r) => r.product_id)
-    : prod.hasBadge ? products.filter((p) => p.badge === 'new').map((p) => p.id) : [];
+    : prod.hasBadge ? products.filter((p) => p.badge === 'bestseller').map((p) => p.id) : [];
 
   return (
     <>
       <div className="adm-head">
         <div>
-          <h1 className="adm-h1">Nouveautés — « Nouveaux arrivages »</h1>
+          <h1 className="adm-h1">Meilleures ventes — section de la page d’accueil</h1>
           <p className="adm-sub">
-            Choisissez les produits de la section « Nouveaux arrivages » de la page d’accueil,
-            puis glissez-les pour définir l’ordre exact. Liste indépendante de la Vitrine
-            et des Meilleures ventes : un produit peut très bien figurer dans les trois.
+            Choisissez les produits du carrousel « Meilleures ventes » de la page d’accueil,
+            puis glissez-les pour définir l’ordre exact. Liste indépendante de la
+            <b> Vitrine</b>, qui ne sert qu’à faire remonter des produits en tête du catalogue.
             Si vous n’en sélectionnez aucun, le site affiche les produits dont la fiche
-            porte le badge « Nouveau ».
+            porte le badge « Best-seller ».
           </p>
         </div>
       </div>
@@ -103,19 +102,20 @@ export default async function ArrivalsPage() {
 
       {!migrated && (
         <div className="adm-err" style={{ marginBottom: 16 }}>
-          <b>La base n’est pas encore à jour</b> — la table <code>new_arrivals</code> manque,
+          <b>La base n’est pas encore à jour</b> — la table <code>best_sellers</code> manque,
           la sélection ne peut donc pas être enregistrée.
           <br />
           Correction en 2 minutes : ouvrez <b>Supabase → SQL Editor → New query</b>, collez le
           fichier <b>supabase/fix-all.sql</b> du projet, puis cliquez <b>Run</b>. Une seule fois,
           sans risque pour vos données.
           <br />
-          En attendant, le site affiche les produits dont la fiche porte le badge « Nouveau ».
+          En attendant, le site affiche les produits dont la fiche porte le badge « Best-seller »,
+          puis la Vitrine.
         </div>
       )}
 
       <ShowcaseManager
-        list="arrivals"
+        list="bestsellers"
         products={products}
         brands={brandsRes.data || []}
         categories={catsRes.data || []}

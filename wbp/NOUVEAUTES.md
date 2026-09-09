@@ -1,3 +1,38 @@
+# Meilleures ventes — écran de gestion dédié — 09/09/2026
+
+## ⚠️ À faire une fois
+
+**Double-cliquez `apply-bestsellers.bat`** (ou collez `supabase/best-sellers.sql`
+dans Supabase → SQL Editor → Run). Il crée la table `best_sellers`.
+`supabase/fix-all.sql` la crée aussi, si vous préférez tout relancer d'un coup.
+
+Sans cette étape, la page `/admin/best-sellers` s'affiche mais ne peut rien
+enregistrer, et l'accueil continue d'afficher l'ancien contenu.
+
+## Ce qui change
+
+Les trois listes sont désormais **indépendantes** :
+
+| Écran | Table | Effet sur le site |
+|---|---|---|
+| **Vitrine** (`/admin/showcase`) | `featured_picks` | Priorité des produits — ils remontent en tête de la page Produits. |
+| **Meilleures ventes** (`/admin/best-sellers`) | `best_sellers` | Contenu et ordre du carrousel « Meilleures ventes » de l'accueil. |
+| **Nouveautés** (`/admin/arrivals`) | `new_arrivals` | Contenu et ordre du carrousel « Nouveaux arrivages ». |
+
+Avant, la Vitrine faisait les deux à la fois : impossible de mettre un produit
+en tête du catalogue sans l'afficher aussi en meilleure vente, et inversement.
+
+Le nouvel écran est identique à la Vitrine (filtres catégorie / marque /
+recherche, clic pour ajouter, glisser-déposer pour ordonner, 200 produits max).
+
+**Repli si la liste est vide**, dans cet ordre : produits portant le badge
+« Best-seller » dans leur fiche → Vitrine → catalogue. La section d'accueil
+n'est donc jamais vide, et l'aspect du site ne change pas tant que vous n'avez
+rien sélectionné. La migration reprend d'ailleurs la Vitrine actuelle comme
+sélection de départ.
+
+---
+
 # Nouveaux arrivages + sélection des produits — 10/08/2026
 
 ## ⚠️ À lire en premier

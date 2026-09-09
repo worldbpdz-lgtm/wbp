@@ -292,3 +292,27 @@
 .adm-btn:focus-visible{ outline:none; box-shadow:0 0 0 3px var(--accent-soft); }
 .adm-btn[disabled]{ opacity:.5; pointer-events:none; }
 .adm-panel{ transition: box-shadow .22s; }
+
+/* -- Photos déjà présentes dans public/products (bloc informatif) -----------
+   Affiché sous la galerie de la fiche produit. Ces fichiers ne sont pas dans
+   la base : ils servent de repli quand products.image_url est vide. Le bloc
+   existe pour qu'on ne téléverse pas un doublon en croyant la fiche vide. */
+.adm-localimg{
+  margin-top:14px; padding:12px 13px; border-radius:14px;
+  border:1px solid var(--line); background:#fdfbf7;
+}
+.adm-localimg.shadowed{ border-color:#e6c27a; background:#fdf7ea; }
+.adm-localimg-head{ display:flex; flex-wrap:wrap; align-items:baseline; gap:4px 9px; margin-bottom:9px; }
+.adm-localimg-head b{ font-size:12px; font-weight:800; color:var(--ink); }
+.adm-localimg-head span{ font-size:11px; color:var(--ink-3); }
+.adm-localimg-strip{
+  display:grid; grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); gap:7px;
+}
+.adm-localimg-strip img{
+  width:100%; aspect-ratio:1; object-fit:contain; background:#fff; padding:6px;
+  border:1px solid var(--line); border-radius:10px; display:block;
+}
+.adm-localimg-warn,
+.adm-localimg-ok{ margin:9px 0 0; font-size:11.5px; line-height:1.5; }
+.adm-localimg-warn{ color:#8a6410; }
+.adm-localimg-ok{ color:var(--ink-3); }

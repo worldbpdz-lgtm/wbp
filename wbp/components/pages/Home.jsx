@@ -115,13 +115,15 @@ function ProductCarousel({ className, kicker, kickerIcon, title, sub, items, onA
 
 function BestSellers() {
   const { t, nav, wbp } = useApp();
-  // Vitrine choisie dans /admin/showcase, dans l'ordre exact défini par l'admin.
-  // Si elle est vide, on retombe sur les best-sellers puis sur le catalogue.
+  // Sélection faite dans /admin/best-sellers, dans l'ordre exact défini par
+  // l'admin. Liste indépendante de la vitrine (/admin/showcase), qui ne règle
+  // que la priorité d'affichage dans le catalogue. Si elle est vide, on
+  // retombe sur les produits marqués « Best-seller », puis sur la vitrine.
   return (
     <ProductCarousel
       className="sec-best" kicker={t('sec_best_kicker')} kickerIcon="bolt"
       title={t('sec_best_title')} sub={t('sec_best_sub')}
-      items={wbp.showcase(8)}
+      items={wbp.bestSellers(8)}
       actionLabel={t('view_all')} onAction={() => nav('catalog')}
     />
   );

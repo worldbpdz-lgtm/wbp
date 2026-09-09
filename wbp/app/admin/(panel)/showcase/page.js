@@ -82,11 +82,12 @@ export default async function ShowcasePage() {
     <>
       <div className="adm-head">
         <div>
-          <h1 className="adm-h1">Vitrine — produits affichés en premier</h1>
+          <h1 className="adm-h1">Vitrine — priorité dans le catalogue</h1>
           <p className="adm-sub">
             Filtrez par catégorie et par marque, cliquez sur les produits à mettre en avant,
-            puis glissez-les pour définir l’ordre exact. Ils apparaissent dans « Meilleures ventes »
-            sur l’accueil et en tête du catalogue.
+            puis glissez-les pour définir l’ordre exact. Ils remontent en tête de la page
+            Produits du site. Le carrousel « Meilleures ventes » de la page d’accueil se
+            règle à part, dans <b>Meilleures ventes</b>.
           </p>
         </div>
       </div>

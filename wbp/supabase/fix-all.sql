@@ -15,6 +15,7 @@
 --   • brands.short                NOT NULL  → ajout d'une marque impossible
 --   • featured_picks              MANQUANTE → Vitrine inutilisable
 --   • new_arrivals                MANQUANTE → Nouveautés inutilisable
+--   • best_sellers                MANQUANTE → Meilleures ventes inutilisable
 --   • ai_config / ai_messages     MANQUANTES → réglages IA non enregistrables
 --   • email_campaigns / _sends    MANQUANTES → section Campagnes cassée
 --   • newsletter_subscribers      colonnes du double opt-in absentes
@@ -188,6 +189,37 @@ insert into new_arrivals (site, product_id, rank)
 on conflict (site, product_id) do nothing;
 
 -- ============================================================================
+-- 5 bis) MEILLEURES VENTES — carrousel « Meilleures ventes » de l'accueil
+-- ----------------------------------------------------------------------------
+-- Liste distincte de la vitrine : `featured_picks` sert à la PRIORITÉ dans le
+-- catalogue, `best_sellers` au carrousel de la page d'accueil.
+-- Sélection dans /admin/best-sellers.
+-- ============================================================================
+create table if not exists best_sellers (
+  id         bigint generated always as identity primary key,
+  site       text not null default 'wbp',
+  product_id text not null references products(id) on delete cascade,
+  rank       int  not null default 0,
+  created_at timestamptz not null default now()
+);
+create unique index if not exists best_sellers_site_product_key on best_sellers(site, product_id);
+create index        if not exists best_sellers_site_rank_idx    on best_sellers(site, rank);
+
+-- Reprise : badge « Best-seller » d'abord, sinon la vitrine actuelle (c'est
+-- elle qui alimentait la section jusqu'ici) — l'accueil reste identique.
+insert into best_sellers (site, product_id, rank)
+  select 'wbp', id, row_number() over (order by sort, id) - 1
+  from products where badge = 'bestseller' and active
+    and not exists (select 1 from best_sellers where site = 'wbp')
+on conflict (site, product_id) do nothing;
+
+insert into best_sellers (site, product_id, rank)
+  select site, product_id, rank from featured_picks
+  where site = 'wbp'
+    and not exists (select 1 from best_sellers where site = 'wbp')
+on conflict (site, product_id) do nothing;
+
+-- ============================================================================
 -- 6) ASSISTANT IA — tables PRIVÉES
 -- ============================================================================
 create table if not exists ai_config (
@@ -239,7 +271,7 @@ do $$
 declare t text;
 begin
   foreach t in array array['brands','categories','products','clients','reviews',
-                           'settings','featured_picks','new_arrivals']
+                           'settings','featured_picks','new_arrivals','best_sellers']
   loop
     if to_regclass('public.'||t) is not null then
       execute format('alter table %I enable row level security', t);
@@ -256,6 +288,7 @@ create policy "public read reviews"        on reviews        for select using (a
 create policy "public read settings"       on settings       for select using (true);
 create policy "public read featured_picks" on featured_picks for select using (true);
 create policy "public read new_arrivals"   on new_arrivals   for select using (true);
+create policy "public read best_sellers"  on best_sellers  for select using (true);
 
 -- Tables strictement privées : RLS active, aucune policy = aucun accès anon.
 do $$
@@ -334,6 +367,7 @@ alter table keep_alive enable row level security;
 -- ============================================================================
 select 'featured_picks'      as objet, case when to_regclass('public.featured_picks')      is not null then 'OK' else 'MANQUANT' end as etat
 union all select 'new_arrivals',         case when to_regclass('public.new_arrivals')         is not null then 'OK' else 'MANQUANT' end
+union all select 'best_sellers',         case when to_regclass('public.best_sellers')         is not null then 'OK' else 'MANQUANT' end
 union all select 'ai_config',            case when to_regclass('public.ai_config')            is not null then 'OK' else 'MANQUANT' end
 union all select 'email_campaigns',      case when to_regclass('public.email_campaigns')      is not null then 'OK' else 'MANQUANT' end
 union all select 'email_campaign_sends', case when to_regclass('public.email_campaign_sends') is not null then 'OK' else 'MANQUANT' end

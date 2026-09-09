@@ -7,6 +7,8 @@
     "prebuild": "node scripts/build-image-manifest.mjs",
     "build": "next build",
     "images:manifest": "node scripts/build-image-manifest.mjs",
+    "images:check": "node scripts/reconcile-images.mjs",
+    "images:fix": "node scripts/reconcile-images.mjs --apply",
     "start": "next start",
     "dev:ip": "next dev -H 127.0.0.1",
     "dev:alt": "next dev -H 127.0.0.1 -p 3005",

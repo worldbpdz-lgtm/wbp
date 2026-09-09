@@ -103,7 +103,7 @@ export async function upsertProduct(p) {
   if (!row.id) return { ok: false, error: 'Identifiant impossible à déduire — saisissez-le manuellement.' };
   const { error, dropped } = await upsertTolerant(sb, 'products', row, 'id', OPTIONAL_PRODUCT_COLS);
   if (error) return { ok: false, error: friendly(error, 'Ce produit') };
-  revalidatePath('/admin/products'); revalidatePath('/admin/showcase'); revalidatePath('/admin/arrivals'); revalidatePath('/', 'layout');
+  revalidatePath('/admin/products'); revalidatePath('/admin/showcase'); revalidatePath('/admin/best-sellers'); revalidatePath('/admin/arrivals'); revalidatePath('/', 'layout');
   return {
     ok: true,
     id: row.id,
@@ -121,12 +121,12 @@ export async function deleteProduct(id) {
   // d'application des migrations, la contrainte peut ne pas être en
   // « on delete cascade » : on nettoie donc explicitement avant de supprimer,
   // sinon la suppression échoue avec une erreur de clé étrangère illisible.
-  for (const t of ['featured_picks', 'new_arrivals']) {
+  for (const t of ['featured_picks', 'best_sellers', 'new_arrivals']) {
     try { await sb.from(t).delete().eq('product_id', pid); } catch { /* table absente */ }
   }
   const { error } = await sb.from('products').delete().eq('id', pid);
   if (error) return { ok: false, error: friendly(error, 'Ce produit') };
-  revalidatePath('/admin/products'); revalidatePath('/admin/showcase'); revalidatePath('/admin/arrivals'); revalidatePath('/', 'layout');
+  revalidatePath('/admin/products'); revalidatePath('/admin/showcase'); revalidatePath('/admin/best-sellers'); revalidatePath('/admin/arrivals'); revalidatePath('/', 'layout');
   return { ok: true };
 }
 export async function toggleProductActive(id, active) {
@@ -472,7 +472,7 @@ const missingTable = (error) => error?.code === 'PGRST205'
   || /relation .* does not exist|could not find the table/i.test(String(error?.message || error || ''));
 
 /**
- * Écrit une liste ordonnée (vitrine ou nouveautés) dans sa table dédiée.
+ * Écrit une liste ordonnée (vitrine, meilleures ventes ou nouveautés) dans sa table dédiée.
  * Si la table n'existe pas encore, on ne renvoie plus une erreur sèche :
  * la sélection est repliée sur products.featured pour la vitrine, et l'admin
  * reçoit un avertissement qui explique quoi faire.
@@ -572,6 +572,38 @@ export async function removeFromShowcase(productId) {
   if (error && missingTable(error)) await sb.from('products').update({ featured: false }).eq('id', pid);
   revalidatePath('/admin/showcase'); revalidatePath('/', 'layout');
   return { ok: true };
+}
+
+// ============================================================================
+// MEILLEURES VENTES — carrousel « Meilleures ventes » de la page d'accueil
+// ----------------------------------------------------------------------------
+// Table best_sellers, distincte de la vitrine : `featured_picks` ne règle que
+// la PRIORITÉ des produits dans le catalogue, cette liste-ci règle le contenu
+// du carrousel de l'accueil. Sélection dans /admin/best-sellers.
+// ============================================================================
+
+/** Remplace la liste des meilleures ventes par `productIds`, dans cet ordre. */
+export async function saveBestSellers(productIds) {
+  await requireAdmin();
+  const sb = createAdminClient();
+  const ids = Array.from(new Set((Array.isArray(productIds) ? productIds : [])
+    .map((x) => s(x, 60)).filter(Boolean))).slice(0, MAX_PICKS);
+
+  const res = await writeRankedList(sb, 'best_sellers', ids, 'Les meilleures ventes');
+  if (res.error) return { ok: false, error: res.error };
+  if (res.missing) {
+    return {
+      ok: false,
+      error: 'La table best_sellers n\'existe pas encore. Collez supabase/fix-all.sql dans '
+        + 'Supabase → SQL Editor → Run (une seule fois), puis réessayez.',
+    };
+  }
+
+  // Comme pour les nouveautés : on ne touche pas au champ `badge` de la fiche
+  // produit. La pastille « Best-seller » reste un choix éditorial indépendant,
+  // et elle sert justement de repli quand cette liste est vide.
+  revalidatePath('/admin/best-sellers'); revalidatePath('/admin/products'); revalidatePath('/', 'layout');
+  return { ok: true, count: ids.length };
 }
 
 // ============================================================================

@@ -51,10 +51,10 @@ export async function selectAll(build, { pageSize = PAGE_ROWS, max = 50000 } = {
 
 // Whole catalog. Falls back to the bundled static catalog if Supabase is unset.
 export async function getCatalog() {
-  if (!hasSupabase()) return { ...fallbackCatalog, picks: [], arrivals: [], source: 'fallback' };
+  if (!hasSupabase()) return { ...fallbackCatalog, picks: [], bestSellers: [], arrivals: [], source: 'fallback' };
   try {
     const sb = await createClient();
-    const [b, c, p, cl, fp, na] = await Promise.all([
+    const [b, c, p, cl, fp, bs, na] = await Promise.all([
       sb.from('brands').select('*').order('sort'),
       sb.from('categories').select('*').order('sort'),
       // Paginé : au-delà de 1000 produits, un select simple s'arrêterait là.
@@ -63,6 +63,10 @@ export async function getCatalog() {
       // Vitrine : ordre choisi dans /admin/showcase. La table peut ne pas
       // exister si la migration n'a pas encore été appliquée — on l'ignore.
       sb.from('featured_picks').select('product_id,rank').eq('site', SITE).order('rank'),
+      // Meilleures ventes : liste PROPRE à la page d'accueil, choisie dans
+      // /admin/best-sellers. Séparée de la vitrine, qui ne sert qu'à la
+      // priorité d'affichage dans le catalogue.
+      sb.from('best_sellers').select('product_id,rank').eq('site', SITE).order('rank'),
       // Nouveautés : ordre choisi dans /admin/arrivals. Même remarque —
       // requête séparée pour qu'une table absente ne casse jamais la vitrine.
       sb.from('new_arrivals').select('product_id,rank').eq('site', SITE).order('rank'),
@@ -72,6 +76,7 @@ export async function getCatalog() {
     const products = (p.data || []).map(mapProduct);
     const live = new Set(products.map((x) => x.id));
     const picks = fp.error ? [] : (fp.data || []).map((r) => r.product_id).filter((id) => live.has(id));
+    const bestSellers = bs.error ? [] : (bs.data || []).map((r) => r.product_id).filter((id) => live.has(id));
     const arrivals = na.error ? [] : (na.data || []).map((r) => r.product_id).filter((id) => live.has(id));
 
     return {
@@ -80,6 +85,7 @@ export async function getCatalog() {
       products,
       clients: (cl.data || []).map((x) => x.name),
       picks,
+      bestSellers,
       arrivals,
       source: 'supabase',
     };
@@ -87,7 +93,7 @@ export async function getCatalog() {
     // Supabase IS configured but the query failed — show the real (empty) state
     // instead of the demo catalog, so the problem is visible rather than masked.
     console.error('getCatalog error:', e?.message);
-    return { brands: [], categories: [], products: [], clients: [], picks: [], arrivals: [], source: 'error' };
+    return { brands: [], categories: [], products: [], clients: [], picks: [], bestSellers: [], arrivals: [], source: 'error' };
   }
 }
 

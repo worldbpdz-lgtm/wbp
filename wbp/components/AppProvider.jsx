@@ -16,15 +16,19 @@ function lsSet(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch
 
 function buildWbp(catalog) {
   const { brands, categories, products, clients } = catalog;
-  // Vitrine (/admin/showcase) : ordre choisi par l'admin. rank 0 = tout devant.
+  // Vitrine (/admin/showcase) : PRIORITÉ dans le catalogue — les produits
+  // choisis remontent en tête de la page Produits. rank 0 = tout devant.
   const picks = Array.isArray(catalog.picks) ? catalog.picks : [];
   const rank = new Map(picks.map((id, i) => [id, i]));
-  // Nouveautés (/admin/arrivals) : liste distincte de la vitrine, un produit
-  // peut donc être à la fois « Meilleure vente » et « Nouveauté ».
+  // Meilleures ventes (/admin/best-sellers) : contenu du carrousel de
+  // l'accueil. Liste indépendante de la vitrine et des nouveautés.
+  const bestSellerIds = Array.isArray(catalog.bestSellers) ? catalog.bestSellers : [];
+  // Nouveautés (/admin/arrivals) : liste distincte des deux précédentes, un
+  // produit peut donc figurer dans les trois.
   const arrivals = Array.isArray(catalog.arrivals) ? catalog.arrivals : [];
   return {
     brands, categories, products, clients, WHATSAPP,
-    picks, arrivals,
+    picks, bestSellerIds, arrivals,
     /** Rang dans la vitrine (Infinity si le produit n'y est pas). */
     pickRank: (id) => (rank.has(id) ? rank.get(id) : Infinity),
     /**
@@ -40,12 +44,19 @@ function buildWbp(catalog) {
       if (rb === -1) return -1;         // b hors vitrine → après a
       return ra - rb;
     },
-    /** Les produits de la vitrine, dans l'ordre, puis un repli si elle est vide. */
-    showcase: (limit = 8) => {
-      const chosen = picks.map((id) => products.find((p) => p.id === id)).filter(Boolean);
+    /**
+     * Meilleures ventes, dans l'ordre choisi dans /admin/best-sellers.
+     * Repli en cascade si la liste est vide : produits marqués
+     * « Best-seller » dans leur fiche, puis la vitrine (comportement
+     * historique), puis le catalogue — la section n'est jamais vide.
+     */
+    bestSellers: (limit = 8) => {
+      const chosen = bestSellerIds.map((id) => products.find((p) => p.id === id)).filter(Boolean);
       if (chosen.length) return chosen.slice(0, limit);
-      const best = products.filter((p) => p.badge === 'bestseller');
-      return (best.length ? best : products).slice(0, limit);
+      const badged = products.filter((p) => p.badge === 'bestseller');
+      if (badged.length) return badged.slice(0, limit);
+      const fromPicks = picks.map((id) => products.find((p) => p.id === id)).filter(Boolean);
+      return (fromPicks.length ? fromPicks : products).slice(0, limit);
     },
     /**
      * Nouveaux arrivages, dans l'ordre choisi dans /admin/arrivals.

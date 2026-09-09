@@ -5,19 +5,21 @@
 // ----------------------------------------------------------------------------
 // Deux colonnes : à gauche le catalogue filtré (catégorie + marque + recherche),
 // à droite la sélection ordonnée. On ajoute d'un clic, on réordonne avec les
-// flèches ou en glissant, on enregistre. L'ordre est celui du site public :
-// page d'accueil (« Meilleures ventes ») et haut du catalogue.
+// flèches ou en glissant, on enregistre. L'ordre saisi ici est celui du site
+// public.
 //
-// Le même écran sert à deux listes distinctes : la VITRINE (« Meilleures
-// ventes ») et les NOUVEAUTÉS (« Nouveaux arrivages »). On passe simplement
-// l'action d'enregistrement et les libellés via les props `list`.
+// Le même écran sert à trois listes distinctes :
+//   • VITRINE          → priorité des produits dans le catalogue
+//   • MEILLEURES VENTES→ carrousel « Meilleures ventes » de l'accueil
+//   • NOUVEAUTÉS       → carrousel « Nouveaux arrivages » de l'accueil
+// On passe simplement l'action d'enregistrement et les libellés via `list`.
 // ============================================================================
 import React, { useState, useMemo, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { saveShowcase, saveArrivals } from '@/app/admin/actions';
+import { saveShowcase, saveBestSellers, saveArrivals } from '@/app/admin/actions';
 import { Icon } from '@/components/primitives';
 
-// Les deux listes gérées par cet écran.
+// Les trois listes gérées par cet écran.
 const LISTS = {
   showcase: {
     save: saveShowcase,
@@ -29,6 +31,17 @@ const LISTS = {
     savedText: (n) => `Vitrine enregistrée — ${n} produit(s) mis en avant.`,
     saveBtn: 'Enregistrer la vitrine',
     cleanText: 'Vitrine à jour',
+  },
+  bestsellers: {
+    save: saveBestSellers,
+    noun: 'Meilleures ventes',
+    addTitle: 'Ajouter aux meilleures ventes',
+    pickedTitle: 'Meilleures ventes',
+    emptyTitle: 'Aucune meilleure vente sélectionnée',
+    emptyHelp: 'Cliquez sur un produit à gauche pour l’afficher dans « Meilleures ventes » sur l’accueil. Tant que la liste est vide, le site affiche les produits marqués « Best-seller » dans leur fiche.',
+    savedText: (n) => `Meilleures ventes enregistrées — ${n} produit(s) affiché(s).`,
+    saveBtn: 'Enregistrer les meilleures ventes',
+    cleanText: 'Meilleures ventes à jour',
   },
   arrivals: {
     save: saveArrivals,

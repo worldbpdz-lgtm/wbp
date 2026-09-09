@@ -14,7 +14,7 @@ const slugify = (v) => String(v || '')
   .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
   .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60);
 
-export default function ProductEditor({ product, brands, categories, isNew }) {
+export default function ProductEditor({ product, brands, categories, isNew, localImages = [] }) {
   const router = useRouter();
   const [f, setF] = useState({
     id: product?.id || '', name: product?.name || '', code: product?.code || '',
@@ -112,6 +112,43 @@ export default function ProductEditor({ product, brands, categories, isNew }) {
             <ImageGallery value={images} onChange={setImages} folder="products" name={f.name || f.code} max={10} />
           </div>
         </div>
+
+        {/* --------------------------------------------------------------
+            Photos déjà présentes dans le dépôt (public/products/).
+            ----------------------------------------------------------------
+            Elles ne sont PAS dans la base : lib/queries.js s’en sert comme
+            repli quand products.image_url est vide. L'éditeur, lui, lit la
+            base brute — sans ce bloc la galerie paraît vide alors que le
+            produit a déjà des photos, et l’on téléverse un doublon qui prend
+            alors le dessus (la base gagne toujours sur le fichier local).
+            Bloc informatif : rien à enregistrer, rien à supprimer d’ici.
+        -------------------------------------------------------------- */}
+        {localImages.length > 0 && (
+          <div className={`adm-localimg ${f.image_url ? 'shadowed' : ''}`}>
+            <div className="adm-localimg-head">
+              <b>{localImages.length} photo{localImages.length > 1 ? 's' : ''} déjà dans le dépôt</b>
+              <span>public/products/ — livrée{localImages.length > 1 ? 's' : ''} avec le site, pas dans la base</span>
+            </div>
+            <div className="adm-localimg-strip">
+              {localImages.map((url) => (
+                /* eslint-disable-next-line @next/next/no-img-element */
+                <img key={url} src={url} alt="" title={decodeURIComponent(url)} loading="lazy" />
+              ))}
+            </div>
+            {f.image_url ? (
+              <p className="adm-localimg-warn">
+                La photo principale ci-dessus vient de la base : c’est elle qui s’affiche,
+                ces fichiers restent masqués. Cliquez « Retirer » sur la photo principale
+                pour laisser le site réafficher la 1ʳᵉ photo du dépôt.
+              </p>
+            ) : (
+              <p className="adm-localimg-ok">
+                Aucune photo en base : le site affiche déjà la 1ʳᵉ de ces images.
+                Inutile d’en téléverser une, sauf pour la remplacer volontairement.
+              </p>
+            )}
+          </div>
+        )}
       </section>
 
       {/* ---------------- Détails ---------------- */}

@@ -7,7 +7,7 @@ import { signOutAction } from '@/app/admin/actions';
 
 const GROUPS = [
   { items: [['/admin', 'Tableau de bord', 'grid'], ['/admin/analytics', 'Analytics', 'chart']] },
-  { label: 'Catalogue', items: [['/admin/products', 'Produits', 'box'], ['/admin/brands', 'Marques', 'badge'], ['/admin/categories', 'Catégories', 'layers'], ['/admin/showcase', 'Vitrine', 'bolt'], ['/admin/arrivals', 'Nouveautés', 'spark']] },
+  { label: 'Catalogue', items: [['/admin/products', 'Produits', 'box'], ['/admin/brands', 'Marques', 'badge'], ['/admin/categories', 'Catégories', 'layers'], ['/admin/showcase', 'Vitrine', 'bolt'], ['/admin/best-sellers', 'Meilleures ventes', 'star'], ['/admin/arrivals', 'Nouveautés', 'spark']] },
   { label: 'Activité', items: [['/admin/quotes', 'Demandes de devis', 'cart', 'quotes'], ['/admin/messages', 'Messages', 'mail', 'messages'], ['/admin/reviews', 'Avis', 'star', 'reviews']] },
   { label: 'E-mailing', items: [['/admin/subscribers', 'Abonnés', 'user'], ['/admin/campaigns', 'Campagnes', 'mail']] },
   { label: 'Site', items: [['/admin/ai', 'Assistant IA', 'headset'], ['/admin/settings', 'Paramètres', 'cog']] },
