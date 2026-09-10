@@ -2,7 +2,8 @@
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { createAdminClient, createClient } from '@/lib/supabase/server';
-import { requireAdmin } from '@/lib/auth';
+import { requireAdmin, getSessionUser } from '@/lib/auth';
+import { isAdminEmail } from '@/lib/admin';
 import { logActivity } from '@/lib/activity';
 import { SITE } from '@/lib/site';
 import { sendEmail, siteUrl } from '@/lib/email/send';
@@ -60,8 +61,18 @@ export async function signOutAction() {
 // Appelée par le formulaire de connexion (web et mobile) juste après une
 // authentification réussie : c'est le seul endroit où l'on sait qu'une
 // connexion vient d'avoir lieu, Supabase authentifiant côté navigateur.
+//
+// Renvoie un VERDICT plutôt que rien. Sans lui, un compte authentifié mais
+// absent d'ADMIN_EMAILS était envoyé vers /admin, d'où le filtre le renvoyait
+// aussitôt vers /admin/login : l'utilisateur restait sur un bouton « Un
+// instant… » sans jamais savoir pourquoi. Le formulaire peut maintenant le
+// dire en clair, sans tenter la navigation.
 export async function logSignInAction() {
-  try { await requireAdmin('auth.signin'); } catch { /* compte non admin : rien à journaliser */ }
+  const user = await getSessionUser();
+  if (!user) return { ok: false, reason: 'no_session' };
+  if (!isAdminEmail(user.email)) return { ok: false, reason: 'not_admin' };
+  await logActivity(user, 'auth.signin');
+  return { ok: true };
 }
 
 // Même chose pour la sortie, mais SANS redirection : l'application mobile

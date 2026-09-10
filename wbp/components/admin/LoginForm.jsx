@@ -1,6 +1,6 @@
 'use client';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { ICON_PATHS } from '@/lib/icons';
 import { logSignInAction } from '@/app/admin/actions';
@@ -32,8 +32,38 @@ function humanError(msg = '') {
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
+// ----------------------------------------------------------------------------
+// Entrée dans le back-office après une connexion réussie.
+//
+// Chargement COMPLET de la page (window.location) et non router.push().
+// Pourquoi : juste avant, le formulaire appelle une server action. Next.js
+// renvoie avec le résultat d'une server action un rendu neuf de la route
+// COURANTE (/admin/login) et l'applique au routeur. Enchaîner un router.push()
+// vers /admin dans la même foulée fait que cette mise à jour annule la
+// navigation : la requête part bien (le serveur répond 200 sur /admin) mais
+// l'écran ne change jamais et le bouton reste sur « Un instant… ».
+//
+// Un rechargement complet ignore l'état du routeur : les cookies de session
+// viennent d'être posés, la page repart proprement, et le navigateur affiche
+// sa propre barre de chargement au lieu d'un bouton figé.
+//
+// La destination est vérifiée : `next` vient de l'URL, donc du visiteur. Seul
+// un chemin interne est accepté — sans quoi /admin/login?next=https://…
+// deviendrait une redirection ouverte vers n'importe quel site.
+// ----------------------------------------------------------------------------
+function goToAdmin(next) {
+  // Un chemin interne commence par « / » mais pas par « // » (qui désigne un
+  // autre domaine), et ne contient aucun antislash : plusieurs navigateurs
+  // convertissent « \\ » en « / », si bien que « /\\evil.com » deviendrait
+  // « //evil.com » — c'est-à-dire une redirection vers un site tiers.
+  const ok = typeof next === 'string'
+    && next.startsWith('/')
+    && !next.startsWith('//')
+    && !next.includes('\\');
+  window.location.assign(ok ? next : '/admin');
+}
+
 export default function LoginForm() {
-  const router = useRouter();
   const sp = useSearchParams();
 
   // 'signin' → formulaire de connexion ; 'forgot' → demande de lien ;
@@ -95,12 +125,20 @@ export default function LoginForm() {
         const supabase = createClient();
         const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
         if (error) { setErr(humanError(error.message)); setBusy(false); return; }
-        // Journal d'activité : Supabase authentifie dans le navigateur, le
-        // serveur n'a donc aucun autre moyen de savoir qu'une connexion a eu
-        // lieu. Volontairement non bloquant.
-        try { await logSignInAction(); } catch { /* journal indisponible */ }
-        router.push(sp.get('next') || '/admin');
-        router.refresh();
+
+        // Le serveur confirme que ce compte est bien administrateur, et
+        // journalise la connexion au passage. Supabase authentifie dans le
+        // navigateur : c'est le seul moment où le serveur peut l'apprendre.
+        let verdict = null;
+        try { verdict = await logSignInAction(); } catch { /* journal indisponible */ }
+        if (verdict && verdict.ok === false && verdict.reason === 'not_admin') {
+          setErr('Ce compte n’est pas autorisé à accéder à l’administration. '
+            + 'Demandez l’ajout de votre adresse à la liste des administrateurs.');
+          setBusy(false);
+          return;
+        }
+
+        goToAdmin(sp.get('next'));
       } catch (e2) { setErr(humanError(e2?.message)); setBusy(false); }
       return;
     }
@@ -130,8 +168,7 @@ export default function LoginForm() {
       const supabase = createClient();
       const { error } = await supabase.auth.updateUser({ password });
       if (error) { setErr(humanError(error.message)); setBusy(false); return; }
-      router.push(sp.get('next') || '/admin');
-      router.refresh();
+      goToAdmin(sp.get('next'));
     } catch (e2) { setErr(humanError(e2?.message)); setBusy(false); }
   };
 

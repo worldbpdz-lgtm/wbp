@@ -31,8 +31,20 @@ export default function Login({ onSignedIn }) {
       const supabase = createClient();
       const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
       if (error) { setErr(humanError(error.message)); setBusy(false); return; }
-      // Journal d'activité : « Connexion » apparaît dans l'onglet Activité.
-      try { await logSignInAction(); } catch { /* journal indisponible */ }
+
+      // Le serveur confirme que le compte est administrateur et journalise la
+      // connexion. Sans ce contrôle, un compte valide mais absent
+      // d'ADMIN_EMAILS entrait dans l'app pour n'y trouver que des écrans
+      // vides : les routes /api/mobile/* lui répondent 403.
+      let verdict = null;
+      try { verdict = await logSignInAction(); } catch { /* journal indisponible */ }
+      if (verdict && verdict.ok === false && verdict.reason === 'not_admin') {
+        setErr('Ce compte n’est pas autorisé. Demandez à l’administrateur d’ajouter votre adresse.');
+        try { await supabase.auth.signOut(); } catch { /* déjà fermé */ }
+        setBusy(false);
+        return;
+      }
+
       onSignedIn?.(data?.session ?? null);
     } catch (e2) {
       setErr(humanError(e2?.message));

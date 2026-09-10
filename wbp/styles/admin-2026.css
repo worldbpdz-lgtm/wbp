@@ -364,3 +364,21 @@
 .docup-zone.busy{ cursor:progress; }
 .docup-zone b{ font-size:13px; }
 .docup-zone i{ font-style:normal; font-size:11.5px; color:var(--ink-3); }
+
+/* ============================================================================
+   Écran d'attente du panneau (app/admin/(panel)/loading.js).
+   ========================================================================== */
+.adm-loading { display: grid; gap: 16px; }
+.adm-skel {
+  border-radius: 14px;
+  background: linear-gradient(100deg, #eceef5 30%, #f6f7fb 50%, #eceef5 70%);
+  background-size: 220% 100%;
+  animation: adm-shimmer 1.2s linear infinite;
+}
+@keyframes adm-shimmer { to { background-position: -120% 0; } }
+.adm-skel.t     { width: 240px; height: 26px; border-radius: 8px; }
+.adm-skel.s     { width: 340px; height: 14px; border-radius: 7px; margin-top: 10px; }
+.adm-skel.kpi   { height: 118px; }
+.adm-skel.panel { height: 268px; border-radius: 18px; }
+.adm-loading-note { margin: 2px; font-size: 12.5px; color: var(--ink-3); font-weight: 600; }
+@media (prefers-reduced-motion: reduce) { .adm-skel { animation: none; } }
