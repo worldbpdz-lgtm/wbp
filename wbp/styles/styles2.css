@@ -179,6 +179,31 @@ body[data-motion="on"] .pp-stock .dot{animation:pulse 2s ease-in-out infinite}
 .pp-doc>svg{color:var(--ink-3)}
 .pp-doc:hover>svg{color:var(--accent)}
 
+/* ---- Documentation constructeur (PDF téléversés depuis /admin) -----------
+   Le bloc réutilise .pp-doc pour rester cohérent avec les autres entrées de
+   l'onglet, mais passe en colonne sous 560px : trois éléments (icône, texte,
+   deux boutons) ne tiennent pas sur une ligne de téléphone. Marges et
+   alignements en propriétés logiques — le site tourne aussi en arabe (RTL). */
+.pp-docs-head{display:flex; flex-direction:column; gap:2px; margin-block-end:2px}
+.pp-docs-head b{font-size:13px; color:var(--ink); letter-spacing:.2px}
+.pp-docs-head i{font-style:normal; font-size:12.5px; color:var(--ink-3)}
+.pp-doc-file{cursor:default}
+.pp-doc-file:hover{transform:none; box-shadow:none; border-color:var(--line)}
+.pp-doc-acts{display:flex; gap:8px; flex-shrink:0}
+.pp-doc-btn{display:inline-flex; align-items:center; gap:6px; padding:9px 13px; border-radius:11px;
+  border:1px solid var(--line); background:var(--surface); color:var(--ink-2);
+  font-size:12.5px; font-weight:700; white-space:nowrap; text-decoration:none;
+  transition:background .2s,color .2s,border-color .2s}
+.pp-doc-btn:hover{border-color:var(--accent); color:var(--accent)}
+.pp-doc-btn.primary{background:var(--accent); border-color:var(--accent); color:#fff}
+.pp-doc-btn.primary:hover{filter:brightness(1.06); color:#fff}
+.pp-doc-btn svg{flex-shrink:0}
+@media (max-width:560px){
+  .pp-doc-file{flex-wrap:wrap}
+  .pp-doc-acts{inline-size:100%; margin-block-start:4px}
+  .pp-doc-btn{flex:1; justify-content:center}
+}
+
 .pp-similar{margin-bottom:clamp(40px,5vw,64px)}
 .pp-similar .sec-head{margin-bottom:26px}
 

@@ -1,7 +1,7 @@
 'use client';
 // ============================================================================
 // Fiche produit (admin) — avec upload de la photo principale et de la galerie.
-// Organisé en 3 blocs : Identité · Photos · Détails, au lieu d'une longue
+// Organisé en blocs : Identité · Photos · Documents · Détails, au lieu d'une longue
 // liste de champs. L'ancien champ « URL image » reste accessible via l'onglet
 // URL du sélecteur d'image.
 // ============================================================================
@@ -9,6 +9,7 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { upsertProduct } from '@/app/admin/actions';
 import ImageUpload, { ImageGallery } from '@/components/admin/ImageUpload';
+import DocsUpload from '@/components/admin/DocsUpload';
 
 const slugify = (v) => String(v || '')
   .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
@@ -25,6 +26,7 @@ export default function ProductEditor({ product, brands, categories, isNew, loca
     active: product?.active ?? true, featured: product?.featured ?? false, sort: product?.sort ?? 0,
   });
   const [images, setImages] = useState(Array.isArray(product?.images) ? product.images : []);
+  const [docs, setDocs] = useState(Array.isArray(product?.docs) ? product.docs : []);
   const [specs, setSpecs] = useState(product?.specs?.length ? product.specs : [['', '']]);
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
@@ -44,7 +46,7 @@ export default function ProductEditor({ product, brands, categories, isNew, loca
     e.preventDefault();
     setErr(''); setBusy(true);
     try {
-      const res = await upsertProduct({ ...f, id: f.id || slugify(f.name), specs, images });
+      const res = await upsertProduct({ ...f, id: f.id || slugify(f.name), specs, images, docs });
       if (!res?.ok) { setErr(res?.error || 'Erreur'); return; }
       // Enregistré, mais une colonne manquait en base : on reste sur la fiche
       // pour que l'avertissement soit lu plutôt que balayé par la redirection.
@@ -149,6 +151,12 @@ export default function ProductEditor({ product, brands, categories, isNew, loca
             )}
           </div>
         )}
+      </section>
+
+      {/* ---------------- Documents ---------------- */}
+      <section className="adm-fieldset">
+        <h3 className="adm-legend">Fiches techniques &amp; documents</h3>
+        <DocsUpload value={docs} onChange={setDocs} productName={f.name || f.code} />
       </section>
 
       {/* ---------------- Détails ---------------- */}

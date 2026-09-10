@@ -5,7 +5,8 @@
 // ============================================================================
 import { revalidatePath } from 'next/cache';
 import { requireAdmin } from '@/lib/auth';
-import { putImage, dropImage } from '@/lib/storage';
+import { logActivity } from '@/lib/activity';
+import { putImage, dropImage, putDoc, dropDoc } from '@/lib/storage';
 
 const FOLDERS = ['products', 'brands', 'categories', 'popup', 'misc'];
 
@@ -61,4 +62,57 @@ export async function deleteImage(url) {
     return { ok: false, error: 'Session expirée.' };
   }
   return dropImage(url);
+}
+
+// ============================================================================
+// Documents PDF (fiches techniques). Appelées par <DocsUpload /> depuis la
+// fiche produit du back-office.
+// ============================================================================
+
+/**
+ * Upload d'un ou plusieurs PDF. Renvoie { ok, docs: [{url,name,label,size}] }.
+ * @param {FormData} formData  champs : file (répétable), name, label
+ */
+export async function uploadDocs(formData) {
+  let user;
+  try {
+    user = await requireAdmin();
+  } catch {
+    return { ok: false, error: 'Session expirée. Reconnectez-vous à /admin.' };
+  }
+
+  const name = String(formData.get('name') || '').slice(0, 120);
+  const label = String(formData.get('label') || '').slice(0, 80);
+  const files = formData.getAll('file').slice(0, 6);
+  if (!files.length) return { ok: false, error: 'Aucun fichier reçu.' };
+
+  const docs = [];
+  const errors = [];
+  for (const f of files) {
+    const r = await putDoc(f, { name, label });
+    if (r.ok) docs.push(r.doc); else errors.push(r.error);
+  }
+  if (!docs.length) return { ok: false, error: errors[0] || 'Aucun document envoyé.' };
+
+  // Journal d'activité : un PDF publié sur le site public mérite une trace,
+  // au même titre qu'une modification de fiche produit.
+  await logActivity(user, 'uploadDoc', docs.map((d) => d.name).join(', '));
+
+  revalidatePath('/admin/products');
+  revalidatePath('/', 'layout');
+  return {
+    ok: true,
+    docs,
+    error: errors.length ? `${errors.length} fichier(s) refusé(s) : ${errors[0]}` : null,
+  };
+}
+
+/** Supprime un PDF du stockage (ignoré si l'URL est externe). */
+export async function deleteDoc(url) {
+  try {
+    await requireAdmin('deleteDoc', url);
+  } catch {
+    return { ok: false, error: 'Session expirée.' };
+  }
+  return dropDoc(url);
 }

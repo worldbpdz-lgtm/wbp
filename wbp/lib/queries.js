@@ -21,12 +21,33 @@ function withLocalImages(r) {
   return { image_url: r.image_url || images[0] || null, images };
 }
 
-const mapProduct = (r) => {
+// ----------------------------------------------------------------------------
+// Fiches techniques (PDF). `docs` n'est renseigné QUE par getProduct() : le
+// catalogue complet part dans le navigateur de chaque visiteur, et y ajouter
+// une URL de PDF pour 1 700 produits alourdirait chaque page pour un contenu
+// que seule la fiche produit affiche.
+//
+// La colonne peut ne pas exister (migration supabase/documents.sql pas encore
+// appliquée) : r.docs vaut alors undefined et on renvoie une liste vide, sans
+// que rien ne casse.
+// ----------------------------------------------------------------------------
+const mapDocs = (r) => (Array.isArray(r.docs) ? r.docs : [])
+  .filter((d) => d && typeof d.url === 'string' && /^https?:\/\//i.test(d.url))
+  .slice(0, 6)
+  .map((d) => ({
+    url: d.url,
+    name: String(d.name || 'document.pdf').slice(0, 160),
+    label: String(d.label || 'Fiche technique').slice(0, 80),
+    size: Number(d.size) || 0,
+  }));
+
+const mapProduct = (r, { withDocs = false } = {}) => {
   const { image_url, images } = withLocalImages(r);
   return {
     id: r.id, cat: r.cat, brand: r.brand, name: r.name, code: r.code, badge: r.badge,
     rating: Number(r.rating) || 0, reviews: r.reviews_count || 0, featured: !!r.featured,
     tag: r.tag || {}, specs: r.specs || [], image_url, price: r.price ?? null, images,
+    ...(withDocs ? { docs: mapDocs(r) } : {}),
   };
 };
 
@@ -103,7 +124,7 @@ export async function getProduct(id) {
     const sb = await createClient();
     const { data, error } = await sb.from('products').select('*').eq('id', id).maybeSingle();
     if (error) throw error;
-    return data ? mapProduct(data) : null;
+    return data ? mapProduct(data, { withDocs: true }) : null;
   } catch {
     return fallbackCatalog.products.find((p) => p.id === id) || null;
   }

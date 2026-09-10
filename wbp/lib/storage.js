@@ -108,3 +108,71 @@ export async function dropImage(url) {
   const { error } = await sb.storage.from(BUCKET).remove([path]);
   return error ? { ok: false, error: error.message } : { ok: true };
 }
+
+// ============================================================================
+// Documents PDF — fiches techniques, manuels, certificats.
+// ----------------------------------------------------------------------------
+// Même bucket public « media » que les photos, sous-dossier docs/. Aucune
+// transformation : un PDF constructeur doit arriver chez le client bit pour
+// bit, avec ses schémas vectoriels et son texte sélectionnable.
+//
+// PDF uniquement, et vérifié sur le CONTENU, pas sur le type déclaré par le
+// navigateur : `file.type` vient du client et se falsifie. Les quatre premiers
+// octets d'un PDF valide sont toujours « %PDF ». Sans ce contrôle, le bucket
+// étant public, on offrirait un hébergement de fichiers arbitraires à qui
+// obtiendrait un accès admin — un .html déposé là s'ouvrirait dans le
+// navigateur du visiteur sur un domaine de confiance.
+// ============================================================================
+
+export const MAX_DOC_BYTES = 25 * 1024 * 1024; // 25 Mo — un manuel scanné est lourd
+
+export async function putDoc(file, { name = '', label = '' } = {}) {
+  if (!file || typeof file.arrayBuffer !== 'function') return { ok: false, error: 'Aucun fichier reçu.' };
+  if (file.size > MAX_DOC_BYTES) {
+    return { ok: false, error: `Fichier trop lourd (${(file.size / 1048576).toFixed(1)} Mo). Maximum 25 Mo.` };
+  }
+  if (file.size === 0) return { ok: false, error: 'Le fichier est vide.' };
+
+  const buffer = Buffer.from(await file.arrayBuffer());
+  // Signature réelle du fichier — « %PDF » suivi de la version.
+  if (buffer.subarray(0, 4).toString('latin1') !== '%PDF') {
+    return { ok: false, error: 'Seuls les fichiers PDF sont acceptés. Convertissez le document en PDF avant de l’envoyer.' };
+  }
+
+  const original = String(file.name || 'document.pdf');
+  const base = slugify(name || original.replace(/\.[^.]+$/, ''), 'document');
+  const stamp = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  const path = `docs/${base}-${stamp}.pdf`;
+
+  const sb = createAdminClient();
+  const { error } = await sb.storage.from(BUCKET).upload(path, buffer, {
+    contentType: 'application/pdf',
+    cacheControl: '31536000',
+    upsert: false,
+  });
+  if (error) {
+    const msg = /bucket/i.test(error.message)
+      ? 'Le stockage « media » est introuvable. Lancez apply-documents.bat une fois.'
+      : error.message;
+    return { ok: false, error: msg };
+  }
+
+  const { data } = sb.storage.from(BUCKET).getPublicUrl(path);
+  return {
+    ok: true,
+    doc: {
+      url: data.publicUrl,
+      // Nom d'origine conservé : c'est celui que le client retrouve dans son
+      // dossier de téléchargements, pas le nom horodaté du stockage.
+      name: original.slice(0, 160),
+      label: String(label || '').slice(0, 80) || 'Fiche technique',
+      size: buffer.length,
+    },
+    path,
+  };
+}
+
+/** Supprime un document du bucket. Ignore les URLs externes. */
+export async function dropDoc(url) {
+  return dropImage(url); // même bucket, même logique de chemin
+}

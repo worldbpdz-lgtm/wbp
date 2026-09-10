@@ -50,11 +50,14 @@ export const ACTION_LABELS = {
   saveArrivals: 'Nouveautés enregistrées',
   saveAiConfig: 'Assistant IA configuré',
   testAiConnection: 'Test de connexion IA',
+  uploadDoc: 'Fiche technique ajoutée',
+  deleteDoc: 'Document supprimé',
 };
 
 // Familles d'actions → couleur / icône dans l'app mobile.
 const FAMILY = [
   [/^auth\./, 'auth', 'user', '#0E9488'],
+  [/Doc$|^uploadDoc|^deleteDoc/, 'documents', 'pdf', '#E0533D'],
   [/Product|Showcase|BestSellers|Arrivals/i, 'catalog', 'box', '#FF5A1F'],
   [/Brand|Category/i, 'catalog', 'layers', '#C98A14'],
   [/Quote/i, 'quotes', 'cart', '#7c3aed'],

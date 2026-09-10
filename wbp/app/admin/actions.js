@@ -86,7 +86,7 @@ export async function logSignOutAction() {
 // maintenant sans les colonnes fautives : la fiche est sauvegardée dans tous
 // les cas, et l'admin est prévenu de ce qui n'a pas pu être stocké.
 // ============================================================================
-const OPTIONAL_PRODUCT_COLS = ['images', 'featured', 'price'];
+const OPTIONAL_PRODUCT_COLS = ['images', 'featured', 'price', 'docs'];
 
 async function upsertTolerant(sb, table, row, onConflict, optional) {
   const attempt = { ...row };
@@ -106,6 +106,28 @@ async function upsertTolerant(sb, table, row, onConflict, optional) {
   return { error: new Error('Enregistrement impossible.'), dropped };
 }
 
+// ----------------------------------------------------------------------------
+// Fiches techniques (PDF) d'un produit.
+// On ne fait confiance ni à l'URL ni à l'intitulé venus du navigateur : le
+// formulaire est protégé, mais une server action reste un point d'entrée
+// public. On ne garde que des URL http(s) et on borne tout le reste.
+// ----------------------------------------------------------------------------
+function cleanDocs(input) {
+  if (!Array.isArray(input)) return [];
+  const out = [];
+  for (const d of input.slice(0, 6)) {
+    const url = s(d?.url, 600);
+    if (!url || !/^https?:\/\//i.test(url)) continue;
+    out.push({
+      url,
+      name: s(d?.name, 160) || 'document.pdf',
+      label: s(d?.label, 80) || 'Fiche technique',
+      size: Math.max(0, parseInt(d?.size, 10) || 0),
+    });
+  }
+  return out;
+}
+
 // ---------- Products ----------
 export async function upsertProduct(p) {
   await requireAdmin('upsertProduct', p?.name || p?.id);
@@ -119,6 +141,7 @@ export async function upsertProduct(p) {
     tag: { fr: s(p.tag_fr, 200) || '', en: s(p.tag_en, 200) || '', ar: s(p.tag_ar, 200) || '' },
     specs, price: (p.price === '' || p.price == null) ? null : Number(p.price), active: !!p.active, featured: !!p.featured, sort: parseInt(p.sort, 10) || 0,
     images: Array.isArray(p.images) ? p.images.filter(Boolean).slice(0, 12).map((u) => s(u, 600)) : [],
+    docs: cleanDocs(p.docs),
   };
   // Photo principale : celle choisie, sinon la 1ʳᵉ de la galerie.
   row.image_url = s(p.image_url, 600) || row.images[0] || null;

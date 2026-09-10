@@ -444,6 +444,30 @@ function ReviewSystem({ product, initialReviews }) {
   );
 }
 
+// Taille lisible d'un PDF : « 480 Ko », « 2,3 Mo ».
+function humanSize(bytes) {
+  const n = Number(bytes) || 0;
+  if (!n) return '';
+  return n < 1048576
+    ? `${Math.max(1, Math.round(n / 1024))} Ko`
+    : `${(n / 1048576).toFixed(1).replace('.', ',')} Mo`;
+}
+
+// Lien de téléchargement forcé. L'attribut HTML `download` est ignoré dès que
+// le fichier vient d'un autre domaine — et nos PDF sont servis par Supabase
+// Storage. Celui-ci accepte ?download=<nom>, ce qui lui fait renvoyer
+// Content-Disposition: attachment : le navigateur enregistre le fichier au
+// lieu de l'ouvrir, sous le nom d'origine du constructeur.
+function downloadUrl(doc) {
+  try {
+    const u = new URL(doc.url);
+    u.searchParams.set('download', doc.name || 'fiche-technique.pdf');
+    return u.toString();
+  } catch {
+    return doc.url;
+  }
+}
+
 export default function Product({ product, initialReviews }) {
   const { t, lang, nav, addToCart, wbp } = useApp();
   const brand = wbp.brandById(product.brand);
@@ -452,6 +476,10 @@ export default function Product({ product, initialReviews }) {
   const [tab, setTab] = React.useState('overview');
   const [added, setAdded] = React.useState(false);
   const [ficheOpen, setFicheOpen] = React.useState(false);
+  // Fiches techniques PDF téléversées depuis le back-office. Absentes tant que
+  // personne n'en a envoyé, et absentes aussi si la migration
+  // supabase/documents.sql n'a pas encore été appliquée.
+  const docs = Array.isArray(product.docs) ? product.docs : [];
   const reviewsRef = React.useRef(null);
 
   React.useEffect(() => { setQty(1); setTab('overview'); scrollTopSmooth(); }, [product.id]);
@@ -549,10 +577,44 @@ export default function Product({ product, initialReviews }) {
             )}
             {tab === 'documents' && (
               <div className="pp-docs">
-                <button className="pp-doc" onClick={() => setFicheOpen(true)}>
-                  <span className="pp-doc-ic"><Icon name="pdf" size={22} /></span>
-                  <span className="pp-doc-txt"><b>{t('fiche_technique')}</b><i>{product.code}.pdf</i></span><Icon name="arrow" size={16} />
-                </button>
+                {/* Documentation constructeur téléversée depuis /admin.
+                    Elle remplace la fiche générée : ce sont les vrais PDF de
+                    Dahua, Ajax ou MAXHUB, pas un résumé de nos specs. */}
+                {docs.length > 0 ? (
+                  <>
+                    <div className="pp-docs-head">
+                      <b>{t('doc_official')}</b>
+                      <i>{t('doc_official_sub')}</i>
+                    </div>
+                    {docs.map((d) => (
+                      <div className="pp-doc pp-doc-file" key={d.url}>
+                        <span className="pp-doc-ic"><Icon name="pdf" size={22} /></span>
+                        <span className="pp-doc-txt">
+                          <b>{d.label}</b>
+                          <i>{d.name}{d.size ? ` · ${humanSize(d.size)}` : ''}</i>
+                        </span>
+                        <span className="pp-doc-acts">
+                          {/* « Ouvrir » lit dans l'onglet ; « Télécharger » force
+                              l'enregistrement — l'attribut download ne marche pas
+                              d'un domaine à l'autre, on passe donc par le
+                              paramètre ?download= de Supabase Storage, qui pose
+                              lui-même l'en-tête Content-Disposition. */}
+                          <a className="pp-doc-btn" href={d.url} target="_blank" rel="noopener noreferrer">
+                            <Icon name="eye" size={15} /> {t('doc_open')}
+                          </a>
+                          <a className="pp-doc-btn primary" href={downloadUrl(d)}>
+                            <Icon name="arrow" size={15} /> {t('doc_download')}
+                          </a>
+                        </span>
+                      </div>
+                    ))}
+                  </>
+                ) : (
+                  <button className="pp-doc" onClick={() => setFicheOpen(true)}>
+                    <span className="pp-doc-ic"><Icon name="pdf" size={22} /></span>
+                    <span className="pp-doc-txt"><b>{t('fiche_technique')}</b><i>{product.code}.pdf</i></span><Icon name="arrow" size={16} />
+                  </button>
+                )}
                 <a className="pp-doc" href={waLink} target="_blank" rel="noopener noreferrer">
                   <span className="pp-doc-ic"><Icon name="whatsapp" size={22} /></span>
                   <span className="pp-doc-txt"><b>{t('whatsapp_chat')}</b><i>commercial@wbp-dz.com</i></span><Icon name="arrow" size={16} />
