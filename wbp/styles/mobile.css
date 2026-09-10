@@ -1,0 +1,306 @@
+/* ============================================================================
+   WBP — application mobile (PWA installée sur l'écran d'accueil).
+   ----------------------------------------------------------------------------
+   Feuille de style AUTONOME : /mobile ne charge ni globals.css ni admin.css.
+   Elle est pensée pour un écran de téléphone tenu à une main — cibles tactiles
+   d'au moins 44 px, navigation en bas, marges qui respectent l'encoche et la
+   barre d'accueil iOS (env(safe-area-inset-*)).
+   ========================================================================== */
+
+:root {
+  --o: #FF5A1F;          /* orange WBP */
+  --o-dark: #E0431A;
+  --o-soft: #FFF1EA;
+  --ink: #15182B;
+  --ink-2: #4A5069;
+  --muted: #8A90A8;
+  --line: #E7E9F2;
+  --bg: #F5F6FA;
+  --card: #FFFFFF;
+  --ok: #1F9D55;
+  --warn: #F59E0B;
+  --info: #3B82F6;
+  --violet: #7C3AED;
+  --teal: #0E9488;
+  --radius: 18px;
+  --shadow: 0 1px 2px rgba(21, 24, 43, .05), 0 8px 24px rgba(21, 24, 43, .06);
+  --tabbar: 62px;
+}
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  /* Empêche le « rubber banding » de tout l'écran : seul le contenu défile. */
+  overscroll-behavior-y: none;
+}
+
+.mb {
+  min-height: 100dvh;
+  padding-bottom: calc(var(--tabbar) + env(safe-area-inset-bottom, 0px));
+}
+
+/* ---------------------------------------------------------------- en-tête -- */
+.mb-top {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: calc(env(safe-area-inset-top, 0px) + 12px) 16px 12px;
+  background: rgba(245, 246, 250, .94);
+  backdrop-filter: saturate(180%) blur(14px);
+  -webkit-backdrop-filter: saturate(180%) blur(14px);
+  border-bottom: 1px solid var(--line);
+}
+.mb-top img { width: 34px; height: 34px; border-radius: 9px; }
+.mb-top h1 { margin: 0; font-size: 17px; font-weight: 800; letter-spacing: -.2px; }
+.mb-top p { margin: 1px 0 0; font-size: 11.5px; color: var(--muted); font-weight: 600; }
+.mb-top .grow { flex: 1; min-width: 0; }
+.mb-icbtn {
+  width: 38px; height: 38px; flex: 0 0 38px;
+  display: grid; place-items: center;
+  border: 1px solid var(--line); border-radius: 12px;
+  background: #fff; color: var(--ink-2);
+  cursor: pointer;
+}
+.mb-icbtn:active { transform: scale(.94); }
+.mb-icbtn.spin svg { animation: mb-spin .9s linear infinite; }
+@keyframes mb-spin { to { transform: rotate(360deg); } }
+
+/* ------------------------------------------------------------- contenu -- */
+.mb-wrap { padding: 14px 14px 26px; display: grid; gap: 14px; }
+.mb-sec-t { margin: 4px 2px -4px; font-size: 12px; font-weight: 800; letter-spacing: .8px; text-transform: uppercase; color: var(--muted); }
+
+.mb-card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 14px;
+}
+.mb-card h2 { margin: 0 0 2px; font-size: 14.5px; font-weight: 800; }
+.mb-card .sub { margin: 0 0 12px; font-size: 12px; color: var(--muted); font-weight: 600; }
+
+/* --------------------------------------------------------------- KPIs --- */
+.mb-kpis { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.mb-kpi {
+  position: relative; overflow: hidden;
+  background: var(--card); border: 1px solid var(--line);
+  border-radius: var(--radius); box-shadow: var(--shadow);
+  padding: 12px 12px 10px;
+}
+.mb-kpi .ic { width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; color: #fff; }
+.mb-kpi .n { font-size: 26px; font-weight: 850; letter-spacing: -1px; margin-top: 8px; line-height: 1; }
+.mb-kpi .l { font-size: 11.5px; color: var(--muted); font-weight: 700; margin-top: 4px; }
+.mb-kpi .tr { position: absolute; top: 12px; right: 12px; font-size: 11px; font-weight: 800; padding: 2px 7px; border-radius: 99px; }
+.mb-kpi .tr.up { color: #0f7a41; background: #e7f7ee; }
+.mb-kpi .tr.down { color: #b3261e; background: #fdecea; }
+.mb-kpi .tr.flat { color: var(--muted); background: #f1f2f7; }
+.mb-kpi .spark { display: block; margin-top: 8px; }
+
+/* ------------------------------------------------------------- barres --- */
+.mb-bars { display: grid; gap: 9px; }
+.mb-bar { display: grid; grid-template-columns: 1fr auto; gap: 4px 8px; align-items: center; }
+.mb-bar .lbl { font-size: 12.5px; font-weight: 700; color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mb-bar .val { font-size: 12.5px; font-weight: 800; color: var(--ink); font-variant-numeric: tabular-nums; }
+.mb-bar .track { grid-column: 1 / -1; height: 7px; border-radius: 99px; background: #eef0f7; overflow: hidden; }
+.mb-bar .fill { display: block; height: 100%; border-radius: 99px; background: linear-gradient(90deg, var(--o), #ff8a5c); }
+
+/* ------------------------------------------------------------- légende -- */
+.mb-legend { display: grid; gap: 7px; margin-top: 10px; }
+.mb-legend span { display: flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 700; color: var(--ink-2); }
+.mb-legend i { width: 10px; height: 10px; border-radius: 3px; flex: 0 0 10px; }
+.mb-legend b { margin-left: auto; font-variant-numeric: tabular-nums; color: var(--ink); }
+
+/* ------------------------------------------------------------ activité -- */
+.mb-daysep {
+  display: flex; align-items: center; gap: 10px;
+  margin: 6px 2px 2px; font-size: 11.5px; font-weight: 800;
+  letter-spacing: .6px; text-transform: uppercase; color: var(--muted);
+}
+.mb-daysep::after { content: ''; flex: 1; height: 1px; background: var(--line); }
+
+.mb-act { display: flex; gap: 11px; padding: 11px 12px; background: var(--card); border: 1px solid var(--line); border-radius: 14px; }
+.mb-act + .mb-act { margin-top: 8px; }
+.mb-act .dot { width: 32px; height: 32px; flex: 0 0 32px; border-radius: 10px; display: grid; place-items: center; color: #fff; }
+.mb-act .bd { min-width: 0; flex: 1; }
+.mb-act .who { font-size: 13px; font-weight: 800; }
+.mb-act .what { font-size: 12.5px; color: var(--ink-2); font-weight: 600; margin-top: 1px; }
+.mb-act .tgt { font-size: 12px; color: var(--muted); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mb-act .hr { font-size: 12px; font-weight: 800; color: var(--muted); font-variant-numeric: tabular-nums; align-self: flex-start; }
+
+/* Puces de filtre par personne (défilement horizontal). */
+.mb-chips { display: flex; gap: 8px; overflow-x: auto; padding: 2px 14px 2px; margin: 0 -14px; scrollbar-width: none; }
+.mb-chips::-webkit-scrollbar { display: none; }
+.mb-chip {
+  flex: 0 0 auto; display: inline-flex; align-items: center; gap: 7px;
+  padding: 8px 13px; border-radius: 99px; border: 1px solid var(--line);
+  background: #fff; color: var(--ink-2); font-size: 13px; font-weight: 700;
+  cursor: pointer;
+}
+.mb-chip b { font-variant-numeric: tabular-nums; color: var(--muted); font-weight: 800; }
+.mb-chip.on { background: var(--ink); border-color: var(--ink); color: #fff; }
+.mb-chip.on b { color: rgba(255, 255, 255, .65); }
+.mb-chip:active { transform: scale(.96); }
+
+/* Sélecteur de fenêtre (7 / 30 / 90 jours). */
+.mb-seg { display: inline-flex; background: #eceef5; border-radius: 12px; padding: 3px; gap: 2px; }
+.mb-seg button {
+  border: 0; background: transparent; color: var(--ink-2);
+  font: inherit; font-size: 12.5px; font-weight: 800;
+  padding: 7px 13px; border-radius: 9px; cursor: pointer;
+}
+.mb-seg button.on { background: #fff; color: var(--ink); box-shadow: 0 1px 3px rgba(0, 0, 0, .12); }
+
+/* -------------------------------------------------------- barre d'onglets */
+.mb-tabs {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 30;
+  display: grid; grid-auto-flow: column; grid-auto-columns: 1fr;
+  background: rgba(255, 255, 255, .95);
+  backdrop-filter: saturate(180%) blur(16px);
+  -webkit-backdrop-filter: saturate(180%) blur(16px);
+  border-top: 1px solid var(--line);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+.mb-tab {
+  display: grid; place-items: center; gap: 3px;
+  height: var(--tabbar); text-decoration: none;
+  color: var(--muted); font-size: 10.5px; font-weight: 800;
+}
+.mb-tab.on { color: var(--o); }
+.mb-tab svg { display: block; }
+
+/* ------------------------------------------------------------- divers --- */
+.mb-empty { padding: 26px 10px; text-align: center; color: var(--muted); font-size: 13px; font-weight: 600; }
+.mb-note { display: flex; gap: 9px; align-items: flex-start; padding: 11px 13px; border-radius: 14px; font-size: 12.5px; font-weight: 650; line-height: 1.45; }
+.mb-note.warn { background: #FFF7E6; color: #8a5a00; border: 1px solid #FBE2B0; }
+.mb-note.off { background: #EEF2FF; color: #33407a; border: 1px solid #D6DEFB; }
+
+.mb-skel { border-radius: 14px; background: linear-gradient(100deg, #eceef5 30%, #f6f7fb 50%, #eceef5 70%); background-size: 220% 100%; animation: mb-sh 1.2s infinite; }
+@keyframes mb-sh { to { background-position: -120% 0; } }
+
+/* ============================================================ connexion == */
+.mb-login {
+  min-height: 100dvh; display: grid; align-content: center; gap: 18px;
+  padding: calc(env(safe-area-inset-top, 0px) + 34px) 22px calc(env(safe-area-inset-bottom, 0px) + 34px);
+  background: var(--bg);
+}
+.mb-login .brand { display: grid; justify-items: center; gap: 12px; text-align: center; }
+.mb-login .brand img { width: 78px; height: 78px; border-radius: 22px; box-shadow: var(--shadow); background: #fff; }
+.mb-login .brand h1 { margin: 6px 0 0; font-size: 24px; font-weight: 850; letter-spacing: -.5px; }
+.mb-login .brand p { margin: 0; font-size: 13px; color: var(--muted); font-weight: 650; }
+.mb-field { display: grid; gap: 6px; }
+.mb-field label { font-size: 12px; font-weight: 800; color: var(--ink-2); }
+.mb-input {
+  width: 100%; height: 52px; padding: 0 14px;
+  border: 1px solid var(--line); border-radius: 14px; background: #fff;
+  font: inherit; font-size: 16px; /* 16px = pas de zoom automatique sur iOS */
+  color: var(--ink);
+}
+.mb-input:focus { outline: none; border-color: var(--o); box-shadow: 0 0 0 4px rgba(255, 90, 31, .14); }
+.mb-pw { position: relative; }
+.mb-pw button { position: absolute; inset-inline-end: 6px; top: 6px; width: 40px; height: 40px; border: 0; background: transparent; color: var(--muted); display: grid; place-items: center; cursor: pointer; }
+.mb-btn {
+  width: 100%; height: 52px; border: 0; border-radius: 14px;
+  background: var(--o); color: #fff; font: inherit; font-size: 16px; font-weight: 800;
+  cursor: pointer; display: grid; place-items: center;
+}
+.mb-btn:active { transform: scale(.985); }
+.mb-btn[disabled] { opacity: .6; }
+.mb-btn.ghost { background: #fff; color: var(--ink-2); border: 1px solid var(--line); height: 46px; font-size: 14px; }
+.mb-err { background: #FDECEA; color: #b3261e; border: 1px solid #F7C9C4; padding: 11px 13px; border-radius: 13px; font-size: 13px; font-weight: 700; }
+
+/* =============================================================== splash == */
+.mb-splash {
+  position: fixed; inset: 0; z-index: 100;
+  display: grid; place-items: center;
+  background: radial-gradient(120% 90% at 50% 18%, #FF8A45 0%, var(--o) 42%, var(--o-dark) 100%);
+  color: #fff; overflow: hidden;
+  animation: mb-splash-out .62s cubic-bezier(.7, 0, .84, 0) forwards;
+  animation-delay: 2.05s;
+}
+@keyframes mb-splash-out {
+  to { opacity: 0; transform: scale(1.06); visibility: hidden; }
+}
+
+/* Ondes concentriques : rappel du radar de l'écran de connexion du back-office. */
+.mb-splash .rings, .mb-splash .rings::before, .mb-splash .rings::after {
+  position: absolute; top: 50%; left: 50%; width: 260px; height: 260px;
+  margin: -130px 0 0 -130px; border-radius: 50%;
+  border: 1.5px solid rgba(255, 255, 255, .22);
+}
+.mb-splash .rings { animation: mb-ring 2.6s ease-out infinite; }
+.mb-splash .rings::before { content: ''; inset: 0; margin: 0; animation: mb-ring 2.6s ease-out .55s infinite; }
+.mb-splash .rings::after { content: ''; inset: 0; margin: 0; animation: mb-ring 2.6s ease-out 1.1s infinite; }
+@keyframes mb-ring {
+  from { transform: scale(.35); opacity: .85; }
+  to { transform: scale(2.1); opacity: 0; }
+}
+
+.mb-splash .inner { position: relative; display: grid; justify-items: center; gap: 20px; padding: 0 28px; text-align: center; }
+
+.mb-splash .mark {
+  width: 96px; height: 96px; border-radius: 28px; background: #fff;
+  display: grid; place-items: center;
+  box-shadow: 0 18px 44px rgba(120, 30, 0, .32);
+  opacity: 0; transform: scale(.6) translateY(14px);
+  animation: mb-mark .82s cubic-bezier(.16, 1.05, .3, 1) .06s forwards;
+}
+.mb-splash .mark img { width: 72px; height: 72px; }
+@keyframes mb-mark {
+  60% { opacity: 1; transform: scale(1.07) translateY(0); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.mb-splash .hello {
+  font-size: 17px; font-weight: 700; letter-spacing: 3.4px; text-transform: uppercase;
+  color: rgba(255, 255, 255, .82);
+  opacity: 0; transform: translateY(12px);
+  animation: mb-rise .6s cubic-bezier(.2, .8, .25, 1) .52s forwards;
+}
+@keyframes mb-rise { to { opacity: 1; transform: translateY(0); } }
+
+.mb-splash .who { display: flex; justify-content: center; overflow: hidden; }
+.mb-splash .who span {
+  display: inline-block; font-size: 46px; font-weight: 850; letter-spacing: -1.4px; line-height: 1.08;
+  opacity: 0; transform: translateY(46px) rotate(4deg);
+  animation: mb-letter .68s cubic-bezier(.18, .9, .24, 1) forwards;
+}
+@keyframes mb-letter { to { opacity: 1; transform: translateY(0) rotate(0); } }
+
+.mb-splash .rule {
+  width: 0; height: 3px; border-radius: 3px; background: rgba(255, 255, 255, .9);
+  animation: mb-rule .72s cubic-bezier(.2, .8, .25, 1) 1.16s forwards;
+}
+@keyframes mb-rule { to { width: 108px; } }
+
+.mb-splash .foot {
+  font-size: 11.5px; font-weight: 800; letter-spacing: 2.6px; text-transform: uppercase;
+  color: rgba(255, 255, 255, .62);
+  opacity: 0; animation: mb-rise .6s ease .3s forwards;
+  position: absolute; bottom: calc(env(safe-area-inset-bottom, 0px) + 34px); left: 0; right: 0; text-align: center;
+}
+
+/* Accessibilité : si l'utilisateur a demandé moins d'animations, on garde un
+   fondu court et on supprime tout mouvement. */
+@media (prefers-reduced-motion: reduce) {
+  .mb-splash, .mb-splash * { animation-duration: .001s !important; animation-delay: 0s !important; }
+  .mb-splash { animation: mb-splash-fade .3s linear 1.1s forwards; }
+  .mb-splash .mark, .mb-splash .hello, .mb-splash .who span { opacity: 1; transform: none; }
+  .mb-splash .rule { width: 108px; }
+  @keyframes mb-splash-fade { to { opacity: 0; visibility: hidden; } }
+  .mb-skel { animation: none; }
+}
+
+/* Écrans très étroits (iPhone SE). */
+@media (max-width: 360px) {
+  .mb-splash .who span { font-size: 38px; }
+  .mb-kpi .n { font-size: 23px; }
+}

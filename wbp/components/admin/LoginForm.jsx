@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { ICON_PATHS } from '@/lib/icons';
+import { logSignInAction } from '@/app/admin/actions';
 
 /* Petites icônes locales : l'espace admin ne charge pas les primitives du site
    public, on rend donc le SVG directement à partir de la même source de vérité. */
@@ -94,6 +95,10 @@ export default function LoginForm() {
         const supabase = createClient();
         const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
         if (error) { setErr(humanError(error.message)); setBusy(false); return; }
+        // Journal d'activité : Supabase authentifie dans le navigateur, le
+        // serveur n'a donc aucun autre moyen de savoir qu'une connexion a eu
+        // lieu. Volontairement non bloquant.
+        try { await logSignInAction(); } catch { /* journal indisponible */ }
         router.push(sp.get('next') || '/admin');
         router.refresh();
       } catch (e2) { setErr(humanError(e2?.message)); setBusy(false); }

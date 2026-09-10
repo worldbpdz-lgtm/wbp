@@ -60,6 +60,24 @@ const nextConfig = {
           { key: 'Cache-Control', value: 'no-store, max-age=0' },
         ],
       },
+      // L'application mobile de l'équipe (/mobile) : pas d'indexation non plus.
+      // Pas de `no-store` en revanche — c'est son service worker qui gère le
+      // cache, et un `no-store` l'empêcherait de fonctionner hors connexion.
+      {
+        source: '/mobile/:path*',
+        headers: [{ key: 'X-Robots-Tag', value: 'noindex, nofollow, noarchive' }],
+      },
+      {
+        source: '/mobile',
+        headers: [{ key: 'X-Robots-Tag', value: 'noindex, nofollow, noarchive' }],
+      },
+      // Le service worker doit pouvoir être remplacé dès qu'une nouvelle
+      // version est déployée : sans cela, le navigateur peut servir l'ancien
+      // pendant 24 h et les téléphones resteraient sur une version périmée.
+      {
+        source: '/sw.js',
+        headers: [{ key: 'Cache-Control', value: 'no-cache, max-age=0, must-revalidate' }],
+      },
     ];
   },
 };

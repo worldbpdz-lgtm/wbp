@@ -3,6 +3,7 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { createAdminClient, createClient } from '@/lib/supabase/server';
 import { requireAdmin } from '@/lib/auth';
+import { logActivity } from '@/lib/activity';
 import { SITE } from '@/lib/site';
 import { sendEmail, siteUrl } from '@/lib/email/send';
 import { wrapEmail, rewriteLinksForTracking, trackingPixel } from '@/lib/email/template';
@@ -46,8 +47,33 @@ function friendly(error, what = 'Cet élément') {
 
 export async function signOutAction() {
   const sb = await createClient();
+  // On lit l'utilisateur AVANT de fermer la session, sinon il n'y a plus
+  // personne à inscrire au journal.
+  try {
+    const { data: { user } } = await sb.auth.getUser();
+    if (user) await logActivity(user, 'auth.signout');
+  } catch { /* le journal ne doit jamais empêcher une déconnexion */ }
   await sb.auth.signOut();
   redirect('/admin/login');
+}
+
+// Appelée par le formulaire de connexion (web et mobile) juste après une
+// authentification réussie : c'est le seul endroit où l'on sait qu'une
+// connexion vient d'avoir lieu, Supabase authentifiant côté navigateur.
+export async function logSignInAction() {
+  try { await requireAdmin('auth.signin'); } catch { /* compte non admin : rien à journaliser */ }
+}
+
+// Même chose pour la sortie, mais SANS redirection : l'application mobile
+// reste sur place et affiche son propre écran de connexion. `signOutAction`
+// (le bouton du back-office web) redirige, lui, vers /admin/login.
+export async function logSignOutAction() {
+  const sb = await createClient();
+  try {
+    const { data: { user } } = await sb.auth.getUser();
+    if (user) await logActivity(user, 'auth.signout');
+  } catch { /* le journal ne doit jamais empêcher une déconnexion */ }
+  await sb.auth.signOut();
 }
 
 // ============================================================================
@@ -82,7 +108,7 @@ async function upsertTolerant(sb, table, row, onConflict, optional) {
 
 // ---------- Products ----------
 export async function upsertProduct(p) {
-  await requireAdmin();
+  await requireAdmin('upsertProduct', p?.name || p?.id);
   const sb = createAdminClient();
   const specs = Array.isArray(p.specs) ? p.specs.filter((r) => r[0] || r[1]).map((r) => [s(r[0], 120) || '', s(r[1], 300) || '']) : [];
   const row = {
@@ -113,7 +139,7 @@ export async function upsertProduct(p) {
   };
 }
 export async function deleteProduct(id) {
-  await requireAdmin();
+  await requireAdmin('deleteProduct', id);
   const sb = createAdminClient();
   const pid = s(id, 60);
   if (!pid) return { ok: false, error: 'Identifiant manquant.' };
@@ -130,7 +156,7 @@ export async function deleteProduct(id) {
   return { ok: true };
 }
 export async function toggleProductActive(id, active) {
-  await requireAdmin();
+  await requireAdmin('toggleProductActive', id);
   const sb = createAdminClient();
   const { error } = await sb.from('products').update({ active: !!active }).eq('id', s(id, 60));
   if (error) return { ok: false, error: friendly(error, 'Ce produit') };
@@ -147,7 +173,7 @@ export async function toggleProductActive(id, active) {
 // que si cette table n'existe pas encore (base non migrée).
 // ----------------------------------------------------------------------------
 export async function toggleProductFeatured(id, featured) {
-  await requireAdmin();
+  await requireAdmin('toggleProductFeatured', id);
   const sb = createAdminClient();
   const pid = s(id, 60);
   if (!pid) return { ok: false, error: 'Identifiant manquant.' };
@@ -183,7 +209,7 @@ export async function toggleProductFeatured(id, featured) {
 // main. Désormais : ID déduit du nom, abrégé rempli automatiquement, logo,
 // ordre d'affichage, et messages d'erreur en français.
 export async function updateBrand(b) {
-  await requireAdmin();
+  await requireAdmin('updateBrand', b?.name || b?.id);
   const sb = createAdminClient();
   const name = s(b.name, 200);
   if (!name) return { ok: false, error: 'Le nom de la marque est obligatoire.' };
@@ -214,7 +240,7 @@ export async function updateBrand(b) {
 }
 
 export async function deleteBrand(id) {
-  await requireAdmin();
+  await requireAdmin('deleteBrand', id);
   const sb = createAdminClient();
   const bid = s(id, 60);
   // Si ce comptage échoue, `count` vaut null et le garde-fou disparaissait en
@@ -233,7 +259,7 @@ export async function deleteBrand(id) {
 
 // ---------- Categories ----------
 export async function updateCategory(c) {
-  await requireAdmin();
+  await requireAdmin('updateCategory', c?.name?.fr || c?.id);
   const sb = createAdminClient();
   const nameFr = s(c.name_fr, 200);
   if (!nameFr) return { ok: false, error: 'Le nom FR de la catégorie est obligatoire.' };
@@ -262,7 +288,7 @@ export async function updateCategory(c) {
 }
 
 export async function deleteCategory(id) {
-  await requireAdmin();
+  await requireAdmin('deleteCategory', id);
   const sb = createAdminClient();
   const cid = s(id, 60);
   const { count, error: countErr } = await sb.from('products')
@@ -294,27 +320,27 @@ async function mutate(run, paths, what) {
 // deviné suffisait à modifier ou supprimer les devis, messages, avis et abonnés
 // de l'autre site.
 export async function updateQuoteStatus(id, status) {
-  await requireAdmin(); const sb = createAdminClient();
+  await requireAdmin('updateQuoteStatus', `devis #${id} → ${status}`); const sb = createAdminClient();
   return mutate(() => sb.from('quote_requests').update({ status: s(status, 30) }).eq('id', id).eq('site', SITE),
     ['/admin/quotes', '/admin'], 'Cette demande');
 }
 export async function deleteQuote(id) {
-  await requireAdmin(); const sb = createAdminClient();
+  await requireAdmin('deleteQuote', `devis #${id}`); const sb = createAdminClient();
   return mutate(() => sb.from('quote_requests').delete().eq('id', id).eq('site', SITE),
     ['/admin/quotes', '/admin'], 'Cette demande');
 }
 export async function updateMessageStatus(id, status) {
-  await requireAdmin(); const sb = createAdminClient();
+  await requireAdmin('updateMessageStatus', `message #${id} → ${status}`); const sb = createAdminClient();
   return mutate(() => sb.from('contact_messages').update({ status: s(status, 30) }).eq('id', id).eq('site', SITE),
     ['/admin/messages', '/admin'], 'Ce message');
 }
 export async function deleteMessage(id) {
-  await requireAdmin(); const sb = createAdminClient();
+  await requireAdmin('deleteMessage', `message #${id}`); const sb = createAdminClient();
   return mutate(() => sb.from('contact_messages').delete().eq('id', id).eq('site', SITE),
     ['/admin/messages', '/admin'], 'Ce message');
 }
 export async function setReviewApproved(id, approved) {
-  await requireAdmin(); const sb = createAdminClient();
+  await requireAdmin('setReviewApproved', `avis #${id} → ${approved ? 'approuvé' : 'masqué'}`); const sb = createAdminClient();
   // Un avis publié apparaît aussitôt sur la fiche produit : on revalide aussi
   // les pages publiques.
   const res = await mutate(() => sb.from('reviews').update({ approved: !!approved }).eq('id', id).eq('site', SITE),
@@ -323,19 +349,19 @@ export async function setReviewApproved(id, approved) {
   return res;
 }
 export async function deleteReview(id) {
-  await requireAdmin(); const sb = createAdminClient();
+  await requireAdmin('deleteReview', `avis #${id}`); const sb = createAdminClient();
   return mutate(() => sb.from('reviews').delete().eq('id', id).eq('site', SITE),
     ['/admin/reviews', '/admin'], 'Cet avis');
 }
 export async function deleteSubscriber(id) {
-  await requireAdmin(); const sb = createAdminClient();
+  await requireAdmin('deleteSubscriber', `abonné #${id}`); const sb = createAdminClient();
   return mutate(() => sb.from('newsletter_subscribers').delete().eq('id', id).eq('site', SITE),
     ['/admin/subscribers', '/admin'], 'Cet abonné');
 }
 
 // ---------- Settings & clients ----------
 export async function saveSetting(key, value) {
-  await requireAdmin();
+  await requireAdmin('saveSetting', key);
   const sb = createAdminClient();
   const { error } = await sb.from('settings').upsert({ site: SITE, key: s(key, 60), value, updated_at: new Date().toISOString() }, { onConflict: 'site,key' });
   if (error) return { ok: false, error: friendly(error, 'Ce réglage') };
@@ -343,7 +369,7 @@ export async function saveSetting(key, value) {
   return { ok: true };
 }
 export async function addClient(name) {
-  await requireAdmin();
+  await requireAdmin('addClient', name);
   const nm = s(name, 200); if (!nm) return { ok: false, error: 'Nom requis' };
   const sb = createAdminClient();
   const { error } = await sb.from('clients').insert({ name: nm, sort: 999, site: SITE });
@@ -352,7 +378,7 @@ export async function addClient(name) {
   return { ok: true };
 }
 export async function deleteClient(id) {
-  await requireAdmin();
+  await requireAdmin('deleteClient', `client #${id}`);
   const sb = createAdminClient();
   const res = await mutate(() => sb.from('clients').delete().eq('id', id).eq('site', SITE),
     ['/admin/settings'], 'Ce client');
@@ -371,7 +397,7 @@ export async function deleteClient(id) {
 // d'abonnés. Chaque requête est désormais limitée au site courant.
 // ============================================================================
 export async function createCampaign() {
-  await requireAdmin();
+  await requireAdmin('createCampaign');
   const sb = createAdminClient();
   const { data, error } = await sb.from('email_campaigns')
     .insert({ subject: 'Nouvelle campagne', body_html: '', site: SITE }).select('id').single();
@@ -382,7 +408,7 @@ export async function createCampaign() {
 }
 
 export async function updateCampaign(id, p) {
-  await requireAdmin();
+  await requireAdmin('updateCampaign', p?.subject || `campagne #${id}`);
   const sb = createAdminClient();
   const row = {
     subject: s(p.subject, 300) || 'Sans objet',
@@ -398,7 +424,7 @@ export async function updateCampaign(id, p) {
 }
 
 export async function deleteCampaign(id) {
-  await requireAdmin();
+  await requireAdmin('deleteCampaign', `campagne #${id}`);
   const sb = createAdminClient();
   return mutate(() => sb.from('email_campaigns').delete().eq('id', s(id, 60)).eq('site', SITE),
     ['/admin/campaigns'], 'Cette campagne');
@@ -412,7 +438,7 @@ function renderCampaignHtml(campaign, { unsubscribeUrl, sendId }) {
 }
 
 export async function sendTestCampaign(id, email) {
-  await requireAdmin();
+  await requireAdmin('sendTestCampaign', email);
   const to = s(email, 200);
   if (!to || !to.includes('@')) return { ok: false, error: 'E-mail invalide' };
   const sb = createAdminClient();
@@ -425,7 +451,7 @@ export async function sendTestCampaign(id, email) {
 }
 
 export async function sendCampaign(id) {
-  await requireAdmin();
+  await requireAdmin('sendCampaign', `campagne #${id}`);
   const sb = createAdminClient();
   const cid = s(id, 60);
   const { data: c } = await sb.from('email_campaigns').select('*')
@@ -512,7 +538,7 @@ async function syncFeaturedColumn(sb, ids) {
 
 /** Remplace toute la vitrine par la liste ordonnée fournie. */
 export async function saveShowcase(productIds) {
-  await requireAdmin();
+  await requireAdmin('saveShowcase', `${productIds?.length || 0} produit(s)`);
   const sb = createAdminClient();
   const ids = Array.from(new Set((Array.isArray(productIds) ? productIds : [])
     .map((x) => s(x, 60)).filter(Boolean))).slice(0, MAX_PICKS);
@@ -544,7 +570,7 @@ export async function saveShowcase(productIds) {
 
 /** Ajoute un produit à la fin de la vitrine. */
 export async function addToShowcase(productId) {
-  await requireAdmin();
+  await requireAdmin('addToShowcase', productId);
   const sb = createAdminClient();
   const pid = s(productId, 60);
   if (!pid) return { ok: false, error: 'Produit manquant.' };
@@ -563,7 +589,7 @@ export async function addToShowcase(productId) {
 
 /** Retire un produit de la vitrine. */
 export async function removeFromShowcase(productId) {
-  await requireAdmin();
+  await requireAdmin('removeFromShowcase', productId);
   const sb = createAdminClient();
   const pid = s(productId, 60);
   const { error } = await sb.from('featured_picks').delete().eq('site', SITE).eq('product_id', pid);
@@ -584,7 +610,7 @@ export async function removeFromShowcase(productId) {
 
 /** Remplace la liste des meilleures ventes par `productIds`, dans cet ordre. */
 export async function saveBestSellers(productIds) {
-  await requireAdmin();
+  await requireAdmin('saveBestSellers', `${productIds?.length || 0} produit(s)`);
   const sb = createAdminClient();
   const ids = Array.from(new Set((Array.isArray(productIds) ? productIds : [])
     .map((x) => s(x, 60)).filter(Boolean))).slice(0, MAX_PICKS);
@@ -615,7 +641,7 @@ export async function saveBestSellers(productIds) {
 
 /** Remplace la liste des nouveautés par `productIds`, dans cet ordre. */
 export async function saveArrivals(productIds) {
-  await requireAdmin();
+  await requireAdmin('saveArrivals', `${productIds?.length || 0} produit(s)`);
   const sb = createAdminClient();
   const ids = Array.from(new Set((Array.isArray(productIds) ? productIds : [])
     .map((x) => s(x, 60)).filter(Boolean))).slice(0, MAX_PICKS);
@@ -649,7 +675,7 @@ const AI_PROVIDERS = ['external', 'builtin', 'off'];
 const normProvider = (v) => (v === 'dtech' ? 'external' : (AI_PROVIDERS.includes(v) ? v : 'builtin'));
 
 export async function saveAiConfig(cfg) {
-  await requireAdmin();
+  await requireAdmin('saveAiConfig');
   const sb = createAdminClient();
   const provider = normProvider(cfg.provider);
   const row = {
@@ -709,7 +735,7 @@ function isPrivateHost(host) {
 }
 
 export async function testAiConnection({ base_url, widget_key }) {
-  await requireAdmin();
+  await requireAdmin('testAiConnection', base_url);
   const base = (s(base_url, 300) || '').replace(/\/+$/, '');
   const key = s(widget_key, 200);
   if (!base || !/^https:\/\//i.test(base)) return { ok: false, error: 'Adresse invalide — elle doit commencer par https://' };
