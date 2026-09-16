@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { useApp } from '@/components/ctx';
 import { Icon, ProductImage, Btn } from '@/components/primitives';
 import QuoteModal from '@/components/QuoteModal';
+import QtyField from '@/components/QtyField';
 
 export default function CartDrawer() {
   const { t, cart, cartOpen, setCartOpen, removeFromCart, setQty, nav, wbp } = useApp();
@@ -37,11 +38,16 @@ export default function CartDrawer() {
                     <button className="cart-item-name" onClick={() => { setCartOpen(false); nav('product', { id: c.id }); }}>{c.name}</button>
                     <span className="cart-item-code">{c.code}</span>
                     <div className="cart-item-row">
-                      <div className="qty">
-                        <button onClick={() => setQty(c.id, c.qty - 1)} aria-label="-"><Icon name="minus" size={14} /></button>
-                        <span>{c.qty}</span>
-                        <button onClick={() => setQty(c.id, c.qty + 1)} aria-label="+"><Icon name="plus" size={14} /></button>
-                      </div>
+                      {/* min=0 : le « − » à 1 retire la ligne du panier, comme
+                          avant — et taper 0 fait la même chose. */}
+                      <QtyField
+                        className="qty"
+                        size={14}
+                        value={c.qty}
+                        min={0}
+                        onChange={(n) => setQty(c.id, n)}
+                        label={`${t('quantity')} — ${c.name}`}
+                      />
                       <button className="cart-item-del" onClick={() => removeFromCart(c.id)} aria-label="remove"><Icon name="trash" size={15} /></button>
                     </div>
                   </div>

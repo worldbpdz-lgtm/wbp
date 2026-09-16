@@ -17,7 +17,7 @@
    incrémenter VERSION ci-dessous.
    ============================================================================ */
 
-const VERSION = 'wbp-mobile-v2';
+const VERSION = 'wbp-mobile-v3';
 const SHELL = `${VERSION}-shell`;
 const ASSETS = `${VERSION}-assets`;
 
@@ -67,16 +67,33 @@ self.addEventListener('fetch', (event) => {
 
   // -- Navigation (ouverture de l'app, changement d'écran) --------------------
   // Réseau d'abord pour rester à jour, cache en secours quand il n'y a rien.
+  //
+  // Seuls les écrans de LECTURE sont mis en cache. Les écrans d'édition ne le
+  // sont jamais, et c'est une décision de fond : une fiche produit servie depuis
+  // le cache afficherait l'ancien prix, l'ancienne photo, l'ancien stock — et
+  // l'enregistrement écraserait alors le travail de quelqu'un d'autre avec des
+  // valeurs périmées, sans que personne ne voie l'erreur. Mieux vaut un écran
+  // qui dit « pas de réseau » qu'un formulaire qui ment.
+  const CACHEABLE = ['/mobile', '/mobile/activity'];
   if (req.mode === 'navigate') {
+    const cacheable = CACHEABLE.includes(url.pathname);
     event.respondWith((async () => {
       try {
         const fresh = await fetch(req);
-        const cache = await caches.open(SHELL);
-        cache.put(req, fresh.clone());
+        if (cacheable) {
+          const cache = await caches.open(SHELL);
+          cache.put(req, fresh.clone());
+        }
         return fresh;
       } catch {
-        const cached = await caches.match(req, { ignoreSearch: true });
-        return cached || (await caches.match('/mobile')) || Response.error();
+        if (cacheable) {
+          const cached = await caches.match(req, { ignoreSearch: true });
+          if (cached) return cached;
+        }
+        // Hors connexion sur un écran d'édition : on renvoie l'écran d'accueil
+        // de l'app plutôt que la page d'erreur du navigateur, qui donne
+        // l'impression que l'application est cassée.
+        return (await caches.match('/mobile')) || Response.error();
       }
     })());
     return;

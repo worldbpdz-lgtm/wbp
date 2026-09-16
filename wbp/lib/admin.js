@@ -33,3 +33,23 @@ export function isOwnerEmail(email) {
   if (!owner || !email) return false;
   return String(email).toLowerCase() === owner;
 }
+
+// ----------------------------------------------------------------------------
+// Qui peut MODIFIER le site depuis le téléphone.
+//
+// Les comptes de l'équipe : ils font le travail (fiches produits, photos,
+// devis, avis, réglages) et ont besoin de le faire depuis un téléphone, dans un
+// dépôt ou chez un client. Le propriétaire, lui, a l'application de
+// supervision — statistiques et journal d'activité — et garde `/admin` sur
+// ordinateur pour ses propres modifications.
+//
+// Deux rôles, deux applications, aucun recouvrement : c'est ce qui permet à
+// chaque écran d'être conçu pour un seul usage au lieu d'être une liste
+// d'options grisées.
+//
+// Le back-office web `/admin` n'est PAS concerné : tous les comptes y ont les
+// mêmes droits, comme avant.
+// ----------------------------------------------------------------------------
+export function isPhoneEditor(email) {
+  return isAdminEmail(email) && !isOwnerEmail(email);
+}

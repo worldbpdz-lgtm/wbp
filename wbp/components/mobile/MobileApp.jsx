@@ -7,6 +7,7 @@ import { logSignOutAction } from '@/app/admin/actions';
 import Splash, { SPLASH_MS } from '@/components/mobile/Splash';
 import Login from '@/components/mobile/Login';
 import { Icon } from '@/components/mobile/ui';
+import { ToastHost } from '@/components/mobile/form';
 import { clearCache, readCache, writeCache } from '@/components/mobile/store';
 
 // ============================================================================
@@ -27,17 +28,51 @@ import { clearCache, readCache, writeCache } from '@/components/mobile/store';
 // téléphone hors connexion ouvre quand même l'application.
 // ============================================================================
 
-// role : 'owner' (propriétaire) · 'admin' (administrateur normal) · 'unknown'
-// (pas encore établi — premier lancement sans réseau). Les écrans réservés
-// attendent 'owner' explicitement : 'unknown' n'ouvre aucune porte.
-const Ctx = createContext({ me: null, owner: false, role: 'unknown', signOut: () => {} });
+// Deux DROITS indépendants, et non un rôle unique :
+//   owner   voit le journal d'activité ;
+//   editor  voit les écrans d'édition.
+// `ready` dit si le serveur a répondu. Tant qu'il vaut false, les deux droits
+// sont faux : un onglet en moins ne casse rien, un onglet de trop montrerait à
+// quelqu'un un écran qui n'est pas le sien.
+//
+// Les garder séparés n'est pas de la gymnastique : donner en plus l'édition au
+// propriétaire (ou retirer le journal) se fait alors dans `lib/admin.js` seul,
+// sans toucher cette coquille.
+const Ctx = createContext({ me: null, owner: false, editor: false, ready: false, signOut: () => {} });
 export const useMobile = () => useContext(Ctx);
 
-// « Stats » est l'application de tout le monde. « Activité » — qui a fait quoi
-// dans le back-office — n'apparaît que pour le propriétaire du site ; pour les
-// autres comptes, l'onglet n'existe pas et la route répond 403.
+// ----------------------------------------------------------------------------
+// Deux applications, une seule adresse.
+//
+//   PROPRIÉTAIRE  Stats · Activité
+//                 Il supervise : les chiffres, et qui a fait quoi. Il modifie
+//                 le site depuis /admin, sur ordinateur.
+//
+//   ÉQUIPE        Stats · Produits · Demandes · Plus
+//                 Elle travaille : fiches et photos, devis et messages, avis,
+//                 vitrine, marques, catégories, réglages.
+//
+// Quatre onglets est la limite : au-delà, les libellés se tronquent sur un
+// iPhone SE. Le reste vit derrière « Plus », qui est un écran, pas un menu
+// flottant — plus facile à viser au pouce.
+//
+// La barre est COMPOSÉE à partir des droits, pas choisie dans une table de
+// rôles : si demain le propriétaire doit aussi pouvoir modifier, la seule chose
+// à changer est `isPhoneEditor()` dans lib/admin.js, et les onglets suivent.
+// ----------------------------------------------------------------------------
 const TAB_STATS = ['/mobile', 'Stats', 'chart'];
 const TAB_ACTIVITY = ['/mobile/activity', 'Activité', 'clock'];
+const TAB_PRODUCTS = ['/mobile/products', 'Produits', 'box'];
+const TAB_INBOX = ['/mobile/inbox', 'Demandes', 'inbox'];
+const TAB_MORE = ['/mobile/plus', 'Plus', 'dots'];
+
+function tabsFor({ owner, editor }) {
+  const tabs = [TAB_STATS];
+  if (editor) tabs.push(TAB_PRODUCTS, TAB_INBOX);
+  if (owner) tabs.push(TAB_ACTIVITY);
+  if (editor) tabs.push(TAB_MORE);
+  return tabs;
+}
 
 export default function MobileApp({ children }) {
   const pathname = usePathname();
@@ -118,22 +153,30 @@ export default function MobileApp({ children }) {
   const known = profile?.email && sessionEmail && profile.email.toLowerCase() === sessionEmail
     ? profile
     : null;
-  const role = known ? (known.owner === true ? 'owner' : 'admin') : 'unknown';
-  const owner = role === 'owner';
+  const ready = !!known;
+  const owner = ready && known.owner === true;
+  const editor = ready && known.editor === true;
 
   const me = session?.user
     ? {
       email: session.user.email,
       name: known?.name || session.user.user_metadata?.full_name || null,
       owner,
+      editor,
     }
     : null;
 
-  const tabs = owner ? [TAB_STATS, TAB_ACTIVITY] : [TAB_STATS];
+  const tabs = tabsFor({ owner, editor });
   const solo = tabs.length < 2;
 
+  // Un onglet actif inclut ses sous-pages : /mobile/products/xyz doit garder
+  // « Produits » allumé, sinon la barre paraît éteinte dès qu'on ouvre une fiche.
+  const isOn = (href) => (href === '/mobile'
+    ? pathname === '/mobile'
+    : pathname === href || pathname.startsWith(`${href}/`));
+
   return (
-    <Ctx.Provider value={{ me, owner, role, signOut }}>
+    <Ctx.Provider value={{ me, owner, editor, ready, signOut }}>
       {splash && <Splash />}
       {session === undefined ? (
         <div className="mb-login"><div className="brand">
@@ -144,19 +187,19 @@ export default function MobileApp({ children }) {
       ) : !session ? (
         <Login onSignedIn={setSession} />
       ) : (
-        <>
+        <ToastHost>
           <div className={`mb${solo ? ' solo' : ''}`}>{children}</div>
           {!solo && (
             <nav className="mb-tabs" aria-label="Navigation principale">
               {tabs.map(([href, label, icon]) => (
-                <Link key={href} href={href} className={`mb-tab ${pathname === href ? 'on' : ''}`}>
+                <Link key={href} href={href} className={`mb-tab ${isOn(href) ? 'on' : ''}`}>
                   <Icon name={icon} size={21} />
                   {label}
                 </Link>
               ))}
             </nav>
           )}
-        </>
+        </ToastHost>
       )}
     </Ctx.Provider>
   );

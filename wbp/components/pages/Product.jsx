@@ -3,6 +3,7 @@ import React from 'react';
 import { useApp } from '@/components/ctx';
 import { Reveal, Icon, Stars, Badge, ProductImage, SectionHead, Btn, fmtRating, scrollTopSmooth } from '@/components/primitives';
 import ProductCard from '@/components/ProductCard';
+import QtyField from '@/components/QtyField';
 import { submitReview } from '@/app/actions';
 import { resolveSubcat, subcatById } from '@/lib/subcategories';
 
@@ -529,11 +530,14 @@ export default function Product({ product, initialReviews }) {
             <Reveal className="pp-price-card" delay={80}>
               <div className="pp-price-row">
                 <div><span className="pp-price">{t('price_quote')}</span><span className="pp-price-note"><Icon name="badge" size={13} /> {t('quote_model')}</span></div>
-                <div className="pp-qty">
-                  <button onClick={() => setQty((q) => Math.max(1, q - 1))} aria-label="-"><Icon name="minus" size={15} /></button>
-                  <span>{qty}</span>
-                  <button onClick={() => setQty((q) => q + 1)} aria-label="+"><Icon name="plus" size={15} /></button>
-                </div>
+                <QtyField
+                  className="pp-qty"
+                  size={15}
+                  value={qty}
+                  min={1}
+                  onChange={setQty}
+                  label={t('quantity')}
+                />
               </div>
               <div className="pp-actions">
                 <button className="btn btn-primary btn-lg pp-add" onClick={() => { addToCart(product, qty); setAdded(true); setTimeout(() => setAdded(false), 1400); }}>

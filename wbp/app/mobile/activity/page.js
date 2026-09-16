@@ -28,20 +28,21 @@ const WINDOWS = [[7, '7 j'], [30, '30 j'], [90, '90 j']];
 export default function ActivityScreen() {
   const [days, setDays] = useState(30);
   const [actor, setActor] = useState(null);
-  const { role } = useMobile();
+  const { owner, ready } = useMobile();
   const router = useRouter();
 
-  // 'unknown' = rôle pas encore établi : on attend sans rien demander ni rien
-  // afficher, plutôt que de renvoyer le propriétaire hors de son propre écran.
+  // Tant que le serveur n'a pas répondu (`ready` faux), on attend sans rien
+  // demander ni rien afficher : renvoyer le propriétaire hors de son propre
+  // écran à cause d'une réponse lente serait pire que d'attendre une seconde.
   useEffect(() => {
-    if (role === 'admin') router.replace('/mobile');
-  }, [role, router]);
+    if (ready && !owner) router.replace('/mobile');
+  }, [ready, owner, router]);
 
   // On récupère TOUTE la fenêtre et on filtre par personne sur le téléphone.
   // Deux raisons : les compteurs des puces restent justes quand un filtre est
   // actif (sinon les autres comptes tomberaient à zéro), et changer de personne
   // devient instantané, même sans réseau.
-  const allowed = role === 'owner';
+  const allowed = owner;
   const key = allowed ? `activity.${days}` : null;
   const { data, status, cachedAt, busy, refresh } = useCached(
     key,

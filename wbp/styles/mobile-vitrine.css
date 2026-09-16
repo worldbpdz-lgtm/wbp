@@ -1,0 +1,89 @@
+/* ============================================================================
+   Écran « Vitrine du site » (/mobile/vitrine).
+   ----------------------------------------------------------------------------
+   Complément de styles/mobile.css, qui fournit déjà le filtre (.mbl-seg), les
+   étiquettes (.mbl-tag), la feuille du bas, la barre d'enregistrement et les
+   boutons. Ne sont ici que les deux choses qui manquaient :
+
+     • la ligne d'une liste ORDONNÉE : vignette + nom + deux flèches + retirer.
+       .mbl-row ne convenait pas — c'est une ligne en flex qu'on touche d'un
+       seul geste, alors qu'ici trois commandes doivent tenir à droite du nom
+       sans descendre sous 46 px de côté. D'où une grille dédiée, et une
+       vignette de 46 px (au lieu de 54) pour laisser de la largeur au nom sur
+       un iPhone SE.
+     • les lignes de la feuille « Ajouter », plus basses que celles de la
+       liste : on y touche une seule fois, il n'y a pas de commande à viser.
+
+   Les flèches sont des caractères (↑ ↓) et non des pictogrammes : lib/icons.js
+   n'en fournit pas, et un chevron pivoté en CSS se lit mal à cette taille.
+   ========================================================================== */
+
+/* ----------------------------------------------------- liste ordonnée -- */
+.mbv-list { display: grid; gap: 9px; }
+
+.mbv-row {
+  display: grid; grid-template-columns: 46px minmax(0, 1fr) 98px; gap: 10px;
+  align-items: center; padding: 10px;
+  border: 1px solid var(--line); border-radius: 15px;
+  background: var(--card); box-shadow: var(--shadow);
+}
+
+.mbv-thumb {
+  width: 46px; height: 46px; border-radius: 11px; overflow: hidden;
+  background: var(--bg); display: grid; place-items: center; color: var(--line);
+}
+.mbv-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+.mbv-bd { min-width: 0; display: grid; gap: 2px; }
+.mbv-bd b {
+  font-size: 14.5px; font-weight: 750; line-height: 1.3;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.mbv-bd small {
+  font-size: 12px; font-weight: 650; color: var(--muted);
+  overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+}
+.mbv-rank { font-variant-numeric: tabular-nums; font-weight: 800; color: var(--ink-2); }
+
+/* Deux flèches côte à côte, « Retirer » sur toute la largeur en dessous :
+   trois boutons de 46 px sur une seule ligne ne laissent plus assez de place
+   au nom du produit sur un écran de 375 px. */
+.mbv-ctrl { display: grid; grid-template-columns: repeat(2, 46px); gap: 6px; }
+.mbv-ctrl button {
+  min-height: 46px; padding: 0; border: 1px solid var(--line); border-radius: 12px;
+  background: var(--card); color: var(--ink-2);
+  font: 800 17px/1 inherit; font-family: inherit;
+  display: grid; place-items: center;
+}
+.mbv-ctrl button:active { transform: scale(.96); }
+.mbv-ctrl button:disabled { opacity: .32; }
+.mbv-ctrl .rm {
+  grid-column: 1 / -1; font: 700 13px/1 inherit; font-family: inherit;
+  color: #DC2626; border-color: #FBD5D5;
+}
+
+/* Point orange sur l'onglet d'une liste modifiée mais pas enregistrée. */
+.mbv-dot {
+  display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+  background: var(--o); margin-inline-start: 5px; vertical-align: middle;
+}
+.mbl-seg button.on .mbv-dot { background: #fff; }
+
+.mbv-hint { margin: 0; font-size: 12px; font-weight: 650; line-height: 1.45; color: var(--muted); }
+
+/* ------------------------------------------------- feuille « Ajouter » -- */
+/* Hauteur bornée et défilement propre : la barre de recherche doit rester
+   visible pendant qu'on parcourt les résultats. */
+.mbv-picks {
+  display: grid; gap: 7px; max-height: 50dvh; overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.mbv-pick {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  min-height: 58px; padding: 8px 10px;
+  border: 1px solid var(--line); border-radius: 13px; background: var(--card);
+  text-align: start; color: var(--ink); font: inherit;
+}
+.mbv-pick:active { transform: scale(.99); }
+.mbv-pick .mbv-bd { flex: 1; }
+.mbv-plus { flex-shrink: 0; color: var(--o); font: 800 19px/1 inherit; width: 24px; text-align: center; }

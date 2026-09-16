@@ -140,6 +140,11 @@ body[data-motion="on"] .pp-stock .dot{animation:pulse 2s ease-in-out infinite}
 .pp-qty button{width:38px; height:42px; border:0; background:none; color:var(--ink); display:grid; place-items:center}
 .pp-qty button:hover{background:var(--accent); color:#fff}
 .pp-qty span{min-width:34px; text-align:center; font-family:var(--font-display); font-weight:700; font-size:15px}
+/* Champ de saisie de la quantité (composant QtyField). font-size:16px n'est pas
+   un choix esthétique : en dessous de 16px, Safari iOS zoome sur le champ dès
+   qu'on le touche et laisse la page décalée. */
+.pp-qty input{width:54px; border:0; background:none; color:var(--ink); text-align:center; font-family:var(--font-display); font-weight:700; font-size:16px; padding:0; appearance:none; -webkit-appearance:none; border-radius:0}
+.pp-qty input:focus{outline:none; background:color-mix(in oklab,var(--accent) 12%,transparent)}
 .pp-actions{display:grid; grid-template-columns:1fr 1fr; gap:11px}
 .pp-add,.pp-wa{width:100%}
 .pp-mini-actions{display:flex; gap:9px; flex-wrap:wrap}

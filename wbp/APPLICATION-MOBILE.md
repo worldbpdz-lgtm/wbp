@@ -1,19 +1,37 @@
 # Application mobile « WBP »
 
 Application pour l'équipe, installée sur l'écran d'accueil de l'iPhone. Une
-seule application, la même adresse pour tout le monde, mais deux versions selon
-le compte qui se connecte :
+seule application, la même adresse pour tout le monde — mais **deux versions**,
+selon le compte qui se connecte.
 
-| | **Stats** — trafic du site et demandes de devis, les mêmes chiffres que `/admin` | **Activité** — qui a fait quoi dans le back-office, quel jour, à quelle heure |
-|---|---|---|
-| **Propriétaire** (1ʳᵉ adresse d'`ADMIN_EMAILS`) | oui | oui |
-| **Administrateur normal** (toutes les autres) | oui | — |
+**Le propriétaire** (la 1ʳᵉ adresse d'`ADMIN_EMAILS`) a l'application de
+**supervision**, deux onglets :
 
-Pour un administrateur normal, l'onglet Activité **n'existe pas** : pas de barre
-d'onglets du tout, juste l'écran des statistiques. Il ne peut pas non plus y
-accéder en tapant l'adresse à la main — le serveur refuse la requête. Le journal
-continue d'enregistrer ses actions comme celles de tout le monde ; ce qui change,
-c'est qui peut le lire.
+| Onglet | Ce qu'il montre |
+|---|---|
+| **Stats** | Le trafic du site et les demandes de devis — les mêmes chiffres que `/admin`. |
+| **Activité** | Qui a fait quoi dans le back-office, quel jour, à quelle heure. |
+
+**Les comptes de l'équipe** (toutes les autres adresses) ont l'application de
+**travail**, quatre onglets :
+
+| Onglet | Ce qu'on y fait |
+|---|---|
+| **Stats** | Les mêmes chiffres que le propriétaire. |
+| **Produits** | Chercher une fiche, la modifier, **changer les photos** (y compris en photographiant le produit avec le téléphone), joindre une fiche technique PDF, masquer, mettre en vitrine, supprimer, créer. |
+| **Demandes** | Les demandes de devis et les messages de contact : lire, changer le statut, **appeler ou écrire sur WhatsApp en un appui**, supprimer. |
+| **Plus** | Avis clients · Vitrine du site · Marques · Catégories · Réglages du site. |
+
+C'est tout le back-office `/admin`, refait pour un écran de téléphone et un
+pouce — pas le site web rétréci. Les deux interfaces écrivent par les **mêmes
+fonctions serveur** : une modification faite au téléphone est identique à la même
+modification faite sur ordinateur, y compris dans le journal d'activité.
+
+Les deux versions ne se recouvrent pas : le propriétaire n'a pas les écrans
+d'édition sur son téléphone (il modifie depuis `/admin`, sur ordinateur), et
+l'équipe n'a pas le journal d'activité. Dans les deux sens, **taper l'adresse à
+la main ne sert à rien** : le serveur refuse la page et l'API. Le journal, lui,
+continue d'enregistrer tout le monde ; ce qui change, c'est qui peut le lire.
 
 Adresse : **`https://VOTRE-DOMAINE/mobile`**
 
@@ -51,16 +69,23 @@ Les comptes de l'application sont **les mêmes** que ceux du back-office
 produit, traiter un devis, envoyer une campagne.
 
 **L'ordre d'`ADMIN_EMAILS` compte.** La première adresse de la liste est le
-compte **propriétaire** : le seul dont l'application mobile affiche l'onglet
-Activité. Les suivantes sont des administrateurs normaux.
+compte **propriétaire** — celui qui a l'application de supervision. Les suivantes
+sont les comptes de l'équipe, qui ont l'application de travail.
 
 ```
 ADMIN_EMAILS=cherif@wbp-dz.com,abdenour@wbp-dz.com,sara@wbp-dz.com
-              └─ propriétaire ──┘ └────── administrateurs normaux ──────┘
+              └─ propriétaire ──┘ └──────── équipe (édition) ──────────┘
+              Stats + Activité      Stats + Produits + Demandes + Plus
 ```
 
 Pour changer de propriétaire, il suffit de placer son adresse en tête de la
 variable et de redéployer. Aucun code à toucher, aucune autre variable à créer.
+
+> **Si le propriétaire veut aussi modifier depuis son téléphone**, la règle tient
+> en une fonction : `isPhoneEditor()` dans `lib/admin.js`. Il suffit de lui faire
+> renvoyer `isAdminEmail(email)` (sans exclure le propriétaire) pour que tout le
+> monde ait les quatre onglets ; l'onglet Activité, lui, reste au propriétaire.
+> C'est le seul endroit à changer.
 
 **Ajouter une personne :**
 
@@ -109,40 +134,91 @@ L'historique est conservé 12 mois (fonction `prune_admin_activity()`).
 
 ---
 
-## 4) Hors connexion
+## 4) Modifier le site depuis le téléphone
 
-L'application garde sa dernière réponse dans le **stockage local du téléphone**
-et affiche ces chiffres immédiatement à l'ouverture, pendant que la mise à jour
-part en arrière-plan. Sans réseau, elle s'ouvre quand même et indique de quand
-datent les données.
+Les comptes de l'équipe ont les mêmes pouvoirs qu'en `/admin`. Trois choses
+valent d'être connues.
+
+**Les photos.** Sur la fiche d'un produit, deux boutons : **Photo**, qui ouvre
+directement la caméra arrière du téléphone, et **Galerie**, qui prend plusieurs
+images déjà enregistrées. On peut donc photographier un produit dans le dépôt et
+l'avoir en ligne trente secondes plus tard. Les fichiers passent par le même
+traitement que sur ordinateur (conversion en WebP, vérifications).
+
+Une seule liste de photos, et **la première est celle qui s'affiche sur le
+site** : un appui sur une photo permet de la définir comme principale, de la
+déplacer ou de la supprimer. Pas de « photo principale » séparée comme sur
+ordinateur — sur un écran de téléphone, deux sélecteurs d'images côte à côte sont
+illisibles.
+
+**Ce qui est enregistré, et quand.** Rien n'est écrit en continu : la barre
+**Enregistrer** apparaît en bas dès qu'il y a une modification, et c'est elle qui
+écrit. Un téléphone perd le réseau au milieu d'un formulaire ; mieux vaut un seul
+envoi explicite qu'une fiche à moitié écrite. Les actions immédiates (masquer,
+mettre en vitrine, changer un statut, supprimer) le disent par un message court
+en bas de l'écran, et une suppression demande toujours confirmation.
+
+**Aucune modification hors connexion.** Les écrans d'édition ne sont jamais mis
+en cache : une fiche rechargée depuis la mémoire du téléphone afficherait
+l'ancien prix et l'ancienne photo, et l'enregistrement écraserait alors le
+travail de quelqu'un d'autre sans que personne ne le voie. Sans réseau,
+l'application ramène à l'écran des statistiques.
+
+---
+
+## 5) Hors connexion
+
+Les **statistiques** gardent leur dernière réponse dans le stockage local du
+téléphone et s'affichent immédiatement à l'ouverture, pendant que la mise à jour
+part en arrière-plan. Sans réseau, l'app s'ouvre quand même et indique de quand
+datent les chiffres.
 
 Concrètement :
 
-- `localStorage` pour les chiffres et l'historique ;
+- `localStorage` pour les chiffres, l'historique et le rôle du compte (c'est ce
+  qui permet à la bonne barre d'onglets d'apparaître sans attendre le réseau) ;
 - un *service worker* (`public/sw.js`), limité à `/mobile`, pour la coquille de
-  l'app (pages, icônes, fichiers statiques) ;
-- rien n'est mis en cache côté `/api` : les données affichées viennent toujours
-  soit du serveur, soit explicitement de la mémoire du téléphone.
+  l'app (pages de lecture, icônes, fichiers statiques) ;
+- **rien** n'est mis en cache côté `/api`, ni sur les écrans d'édition : voir la
+  section précédente.
 
 Le bouton **Déconnexion** efface le cache local du téléphone en même temps
-qu'il ferme la session.
+qu'il ferme la session — un appareil prêté n'affiche pas les chiffres du compte
+précédent.
 
 Après un déploiement qui modifie l'app, incrémenter `VERSION` en haut de
 `public/sw.js` pour que tous les téléphones récupèrent la nouvelle version.
 
 ---
 
-## 5) Fichiers
+## 6) Fichiers
 
 ```
-app/mobile/                    Les écrans (Stats, et Activité pour le propriétaire)
+app/mobile/page.js             Stats (tous les comptes)
+app/mobile/activity/           Journal — propriétaire seulement
+app/mobile/products/           Liste + fiche produit (photos, PDF, tout)
+app/mobile/inbox/              Devis et messages · appel / WhatsApp
+app/mobile/reviews/            Modération des avis
+app/mobile/vitrine/            Vitrine · meilleures ventes · nouveautés
+app/mobile/marques/            Marques et logos
+app/mobile/categories/         Catégories et images
+app/mobile/reglages/           Réglages du site public
+app/mobile/plus/               Menu vers les écrans ci-dessus
+app/mobile/guard.js            Barrière d'accès des écrans d'édition
 app/mobile/layout.js           Nom « WBP », icône, plein écran iOS
-app/api/mobile/me/             Nom affiché + rôle du compte connecté
+
+app/api/mobile/me/             Nom affiché + droits du compte connecté
 app/api/mobile/stats/          Chiffres — appelle getDashboard()/getAnalytics()
 app/api/mobile/activity/       Journal — réservé au propriétaire
-components/mobile/             Coquille, écran d'ouverture, connexion, graphiques
+
+components/mobile/form.jsx     Champs, feuilles du bas, barre d'enregistrement
+components/mobile/PhotoPicker  Photos : caméra, galerie, ordre, principale
+components/mobile/DocPicker    Fiches techniques PDF
+components/mobile/*Screen.jsx  Un écran par fichier
 styles/mobile.css              Feuille de style autonome de l'app
-lib/admin.js                   Qui est administrateur · qui est propriétaire
+styles/mobile-*.css            Compléments propres à un écran
+
+lib/admin.js                   Qui est administrateur · propriétaire · éditeur
 lib/activity.js                Écriture et lecture du journal
 public/wbp-app.webmanifest     Manifeste d'installation
 public/sw.js                   Mode hors connexion
@@ -151,7 +227,21 @@ supabase/activity.sql          Migration (additive) du journal
 apply-activity.bat             Applique la migration
 ```
 
-Les chiffres de l'onglet Stats ne sont **pas** recalculés : la route API appelle
-`getDashboard()` et `getAnalytics()`, exactement les fonctions du tableau de
-bord web. Le téléphone et l'ordinateur ne peuvent donc pas afficher deux
-nombres différents pour la même chose.
+Deux principes tiennent tout ce dossier, et ils expliquent la plupart des choix
+qu'on pourrait trouver surprenants en lisant le code :
+
+**Rien n'est recalculé, rien n'est réécrit.** L'onglet Stats appelle
+`getDashboard()` et `getAnalytics()` — exactement les fonctions du tableau de bord
+web. Les écrans d'édition appellent les server actions d'`app/admin/actions.js` —
+exactement celles du back-office. Le téléphone ne contient aucune règle métier :
+ni un calcul, ni une validation, ni une écriture en base qui lui soit propre.
+C'est ce qui garantit qu'une fiche modifiée au téléphone est identique à la même
+fiche modifiée sur ordinateur, journal d'activité compris, et qu'une correction
+faite une fois vaut pour les deux interfaces.
+
+**Ce qui protège est côté serveur.** La barre d'onglets ne fait que cacher des
+liens. Les vraies barrières sont `app/mobile/guard.js` pour l'affichage des
+pages, `requireAdmin()` dans chaque server action pour les écritures, et le
+contrôle du propriétaire dans `/api/mobile/activity`. Une adresse tapée à la
+main, un raccourci enregistré ou un retour en arrière dans l'historique ne
+donnent accès à rien.

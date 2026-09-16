@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getSessionUser } from '@/lib/auth';
-import { isAdminEmail, isOwnerEmail } from '@/lib/admin';
+import { isAdminEmail, isOwnerEmail, isPhoneEditor } from '@/lib/admin';
 import { displayName } from '@/lib/activity';
 
 // ============================================================================
@@ -8,9 +8,15 @@ import { displayName } from '@/lib/activity';
 // ----------------------------------------------------------------------------
 // Renvoie le nom affiché du compte connecté et son rôle :
 //
-//   owner: true   le propriétaire du site (première adresse d'ADMIN_EMAILS) :
-//                 l'application affiche en plus l'onglet « Activité » ;
-//   owner: false  un administrateur normal : application à un seul écran.
+//   owner: true    le propriétaire du site (première adresse d'ADMIN_EMAILS) :
+//                  application de SUPERVISION — statistiques + journal
+//                  d'activité, et aucun écran d'édition (il modifie depuis
+//                  /admin, sur ordinateur) ;
+//   editor: true   un compte de l'équipe : application de TRAVAIL —
+//                  statistiques, produits, demandes, avis, réglages.
+//
+// Les deux sont exclusifs : un compte a l'une ou l'autre application, jamais un
+// mélange des deux avec des options grisées.
 //
 // C'est le serveur qui tranche, jamais le téléphone : la réponse est rangée
 // dans le stockage local pour que l'app s'ouvre correctement hors connexion,
@@ -33,5 +39,6 @@ export async function GET() {
     email: user.email,
     name: displayName(user),
     owner: isOwnerEmail(user.email),
+    editor: isPhoneEditor(user.email),
   }, { headers: { 'Cache-Control': 'no-store' } });
 }

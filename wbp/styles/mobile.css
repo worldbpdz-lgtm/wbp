@@ -311,3 +311,372 @@ html, body {
   .mb-splash .who span { font-size: 38px; }
   .mb-kpi .n { font-size: 23px; }
 }
+
+/* ============================================================================
+   ÉCRANS D'ÉDITION (comptes administrateurs de l'équipe)
+   ----------------------------------------------------------------------------
+   Tout ce qui suit sert aux écrans qui MODIFIENT le site : fiches produits,
+   photos, demandes, avis, réglages. Préfixe .mbf- (formulaire), .mbp- (photos),
+   .mbd- (documents), .mbl- (listes).
+
+   Deux règles gouvernent ce bloc, et elles ne sont pas décoratives :
+
+     1. 16px minimum sur tout champ de saisie. En dessous, Safari iOS zoome sur
+        le champ au premier contact et laisse la page décalée — l'utilisateur
+        doit pincer pour revenir. C'est la cause n°1 des formulaires mobiles
+        pénibles, et elle est invisible en test sur ordinateur.
+     2. 46px minimum sur tout ce qui se touche (44px est le minimum d'Apple).
+   ========================================================================== */
+
+/* ----------------------------------------------------------------- champs -- */
+.mbf-field { display: grid; gap: 7px; }
+.mbf-field > label {
+  font-size: 12.5px; font-weight: 750; color: var(--ink-2);
+  letter-spacing: .01em;
+}
+.mbf-hint { margin: 0; font-size: 12px; line-height: 1.45; color: var(--muted); font-weight: 600; }
+.mbf-hint.bad { color: #DC2626; }
+
+.mbf-input {
+  width: 100%; min-height: 46px; padding: 12px 14px;
+  border: 1px solid var(--line); border-radius: 13px;
+  background: var(--card); color: var(--ink);
+  /* 16px : voir l'en-tête de ce bloc. Ne pas descendre. */
+  font: 600 16px/1.4 inherit; font-family: inherit;
+  appearance: none; -webkit-appearance: none;
+  transition: border-color .15s, box-shadow .15s;
+}
+.mbf-input:focus {
+  outline: none; border-color: var(--o);
+  box-shadow: 0 0 0 3px rgba(255, 90, 31, .15);
+}
+.mbf-input::placeholder { color: var(--muted); font-weight: 500; }
+.mbf-input.area { min-height: 104px; resize: vertical; line-height: 1.5; }
+.mbf-field.bad .mbf-input { border-color: #DC2626; }
+
+/* Sélecteur : bouton qui ouvre une feuille du bas. */
+.mbf-picker {
+  width: 100%; min-height: 46px; padding: 12px 14px;
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  border: 1px solid var(--line); border-radius: 13px; background: var(--card);
+  color: var(--ink); font: 650 16px/1.3 inherit; text-align: start;
+}
+.mbf-picker .ph { color: var(--muted); font-weight: 500; }
+.mbf-picker svg { color: var(--muted); flex-shrink: 0; }
+
+.mbf-options { display: grid; gap: 2px; }
+.mbf-option {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  width: 100%; min-height: 52px; padding: 12px 14px;
+  border: 0; border-radius: 12px; background: none; text-align: start;
+  color: var(--ink); font: inherit;
+}
+.mbf-option .bd { display: grid; gap: 2px; }
+.mbf-option .bd b { font-size: 15.5px; font-weight: 700; }
+.mbf-option .bd small { font-size: 12.5px; color: var(--muted); font-weight: 600; }
+.mbf-option.on { background: var(--o-soft); }
+.mbf-option.on svg { color: var(--o); }
+
+/* Interrupteur. */
+.mbf-switch { display: flex; align-items: flex-start; gap: 13px; min-height: 46px; padding: 4px 0; }
+.mbf-switch input { position: absolute; opacity: 0; width: 0; height: 0; }
+.mbf-switch .track {
+  flex-shrink: 0; width: 50px; height: 31px; border-radius: 999px;
+  background: #D4D7E4; position: relative; transition: background .2s; margin-top: 1px;
+}
+.mbf-switch .knob {
+  position: absolute; top: 2.5px; inset-inline-start: 2.5px; width: 26px; height: 26px;
+  border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0, 0, 0, .22);
+  transition: transform .2s;
+}
+.mbf-switch input:checked + .track { background: var(--ok); }
+.mbf-switch input:checked + .track .knob { transform: translateX(19px); }
+.mbf-switch input:focus-visible + .track { box-shadow: 0 0 0 3px rgba(255, 90, 31, .3); }
+.mbf-switch .txt { display: grid; gap: 2px; }
+.mbf-switch .txt b { font-size: 15px; font-weight: 700; color: var(--ink); }
+.mbf-switch .txt small { font-size: 12.5px; color: var(--muted); font-weight: 600; line-height: 1.45; }
+
+/* Recherche. */
+.mbf-search {
+  display: flex; align-items: center; gap: 9px; padding-inline: 13px;
+  border: 1px solid var(--line); border-radius: 13px; background: var(--card);
+}
+.mbf-search > svg { color: var(--muted); flex-shrink: 0; }
+.mbf-search .mbf-input {
+  border: 0; background: none; padding-inline: 0; box-shadow: none; min-height: 46px;
+}
+.mbf-search .mbf-input:focus { box-shadow: none; }
+.mbf-search .mbf-input::-webkit-search-cancel-button { display: none; }
+.mbf-search > button {
+  border: 0; background: none; color: var(--muted); padding: 6px; display: grid; place-items: center;
+}
+
+/* -------------------------------------------------------------- conteneurs -- */
+.mbf-group { display: grid; gap: 4px; }
+.mbf-group-t {
+  margin: 4px 0 0; font-size: 11.5px; font-weight: 800; letter-spacing: .1em;
+  text-transform: uppercase; color: var(--muted);
+}
+.mbf-group-n { margin: 0 0 4px; font-size: 12.5px; color: var(--muted); font-weight: 600; line-height: 1.45; }
+.mbf-group-bd {
+  display: grid; gap: 14px; padding: 15px;
+  background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.mbf-banner {
+  display: flex; align-items: flex-start; gap: 10px; padding: 12px 13px;
+  border-radius: 14px; font-size: 13px; font-weight: 650; line-height: 1.45;
+  background: #EEF2FF; color: #3730A3; border: 1px solid #DDE3FF;
+}
+.mbf-banner svg { flex-shrink: 0; margin-top: 1px; }
+.mbf-banner.ok { background: #ECFDF3; color: #15803D; border-color: #C9F0D8; }
+.mbf-banner.bad { background: #FEF2F2; color: #B91C1C; border-color: #FBD5D5; }
+.mbf-banner.warn { background: #FFFBEB; color: #92400E; border-color: #FDE9B5; }
+.mbf-banner > button { margin-inline-start: auto; border: 0; background: none; color: inherit; opacity: .7; padding: 2px; }
+
+.mbf-empty {
+  display: grid; justify-items: center; gap: 12px; padding: 44px 24px; text-align: center;
+  color: var(--muted);
+}
+.mbf-empty svg { color: var(--line); }
+.mbf-empty p { margin: 0; font-size: 14px; font-weight: 650; line-height: 1.5; }
+
+/* ------------------------------------------------------------------ boutons -- */
+.mbf-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  min-height: 48px; padding: 12px 18px;
+  border: 1px solid var(--line); border-radius: 13px; background: var(--card);
+  color: var(--ink); font: 700 15px/1 inherit; font-family: inherit;
+  transition: transform .12s, background .15s;
+}
+.mbf-btn:active { transform: scale(.985); }
+.mbf-btn:disabled { opacity: .45; }
+.mbf-btn.primary { background: var(--o); border-color: var(--o); color: #fff; }
+.mbf-btn.danger { background: #fff; border-color: #FBD5D5; color: #DC2626; }
+.mbf-btn.ghost { background: none; border-color: transparent; color: var(--ink-2); }
+.mbf-btn.grow { flex: 1; }
+.mbf-btn.sm { min-height: 40px; padding: 9px 13px; font-size: 13.5px; border-radius: 11px; }
+
+/* Barre d'enregistrement, collée au-dessus de la barre d'onglets. */
+.mbf-savebar {
+  position: fixed; z-index: 28; left: 0; right: 0;
+  bottom: calc(var(--tabbar) + env(safe-area-inset-bottom, 0px));
+  display: flex; gap: 9px; padding: 11px 14px;
+  background: rgba(255, 255, 255, .96);
+  backdrop-filter: saturate(180%) blur(16px);
+  -webkit-backdrop-filter: saturate(180%) blur(16px);
+  border-top: 1px solid var(--line);
+}
+/* Sur un écran sans barre d'onglets (pages ouvertes depuis « Plus »). */
+.mb.solo .mbf-savebar, .mbf-savebar.solo { bottom: env(safe-area-inset-bottom, 0px); }
+/* De la place pour que la barre ne recouvre pas le dernier champ. */
+.mbf-pad { height: 74px; }
+
+/* ------------------------------------------------------- feuille du bas -- */
+.mbf-sheet-wrap { position: fixed; inset: 0; z-index: 60; display: flex; align-items: flex-end; }
+.mbf-scrim { position: absolute; inset: 0; background: rgba(12, 14, 26, .42); animation: mbf-fade .18s ease; }
+.mbf-sheet {
+  position: relative; width: 100%; max-height: 86dvh; overflow-y: auto;
+  background: var(--card); border-radius: 22px 22px 0 0;
+  padding: 8px 16px calc(18px + env(safe-area-inset-bottom, 0px));
+  animation: mbf-up .26s cubic-bezier(.2, .8, .25, 1);
+}
+@keyframes mbf-fade { from { opacity: 0; } }
+@keyframes mbf-up { from { transform: translateY(14px); opacity: .6; } }
+.mbf-grab {
+  display: block; width: 44px; height: 5px; margin: 6px auto 12px;
+  border: 0; border-radius: 999px; background: var(--line); padding: 0;
+}
+.mbf-sheet-t { margin: 0 0 14px; font-size: 17px; font-weight: 800; color: var(--ink); text-align: center; }
+.mbf-sheet-bd { display: grid; gap: 12px; }
+.mbf-sheet-ft { margin-top: 16px; display: grid; gap: 9px; }
+.mbf-confirm-b { margin: 0 0 18px; font-size: 14px; line-height: 1.55; color: var(--ink-2); font-weight: 600; text-align: center; }
+.mbf-confirm-a { display: grid; gap: 9px; }
+
+/* -------------------------------------------------------------------- toast -- */
+.mbf-toast {
+  position: fixed; z-index: 70; left: 14px; right: 14px;
+  bottom: calc(var(--tabbar) + env(safe-area-inset-bottom, 0px) + 14px);
+  display: flex; align-items: center; gap: 9px; padding: 13px 15px;
+  border-radius: 14px; background: #15182B; color: #fff;
+  font-size: 14px; font-weight: 700; box-shadow: 0 10px 30px rgba(21, 24, 43, .3);
+  animation: mbf-toast-in .22s cubic-bezier(.2, .8, .25, 1);
+}
+.mbf-toast.bad { background: #B91C1C; }
+@keyframes mbf-toast-in { from { transform: translateY(12px); opacity: 0; } }
+
+/* ------------------------------------------------------------------ photos -- */
+.mbp { display: grid; gap: 10px; }
+.mbp-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.mbp-cell {
+  position: relative; aspect-ratio: 1; border: 1px solid var(--line); border-radius: 13px;
+  overflow: hidden; background: var(--bg); padding: 0;
+}
+.mbp-cell img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.mbp-main {
+  position: absolute; inset-inline: 4px; bottom: 4px; padding: 3px 6px;
+  border-radius: 7px; background: rgba(21, 24, 43, .82); color: #fff;
+  font-size: 9.5px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase;
+}
+.mbp-more {
+  position: absolute; top: 4px; inset-inline-end: 4px; width: 22px; height: 22px;
+  display: grid; place-items: center; border-radius: 50%;
+  background: rgba(255, 255, 255, .92); color: var(--ink-2);
+}
+.mbp-add {
+  aspect-ratio: 1; display: grid; place-items: center; align-content: center; gap: 5px;
+  border: 1.5px dashed var(--line); border-radius: 13px; background: var(--card);
+  color: var(--ink-2); font-size: 11.5px; font-weight: 750; padding: 4px;
+}
+.mbp-add svg { color: var(--o); }
+.mbp-add:disabled { opacity: .5; }
+.mbp-hint { margin: 0; font-size: 12px; font-weight: 600; color: var(--muted); }
+.mbp-hint.bad { color: #DC2626; }
+.mbp-preview {
+  border-radius: 14px; overflow: hidden; background: var(--bg); margin-bottom: 14px;
+  max-height: 40dvh; display: grid; place-items: center;
+}
+.mbp-preview img { width: 100%; height: 100%; max-height: 40dvh; object-fit: contain; display: block; }
+.mbp-acts { display: grid; gap: 9px; }
+.mbp-acts .row { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
+.mbp-spin {
+  width: 20px; height: 20px; border-radius: 50%;
+  border: 2.4px solid var(--line); border-top-color: var(--o);
+  animation: mb-spin .7s linear infinite;
+}
+
+/* --------------------------------------------------------------- documents -- */
+.mbd { display: grid; gap: 11px; }
+.mbd-row {
+  display: flex; align-items: flex-start; gap: 11px; padding: 12px;
+  border: 1px solid var(--line); border-radius: 14px; background: var(--card);
+}
+.mbd-row .ic {
+  flex-shrink: 0; width: 38px; height: 38px; border-radius: 10px;
+  display: grid; place-items: center; background: #FEF2F2; color: #E0533D;
+}
+.mbd-row .bd { flex: 1; min-width: 0; display: grid; gap: 5px; }
+.mbd-row .bd small { font-size: 11.5px; color: var(--muted); font-weight: 650; word-break: break-all; }
+.mbd-row .del {
+  flex-shrink: 0; width: 40px; height: 40px; border: 0; border-radius: 10px;
+  background: none; color: var(--muted); display: grid; place-items: center;
+}
+
+/* ------------------------------------------------------------------ listes -- */
+/* Lignes tapables d'une liste (produits, devis, avis, marques…). */
+.mbl { display: grid; gap: 9px; }
+.mbl-row {
+  display: flex; align-items: center; gap: 12px; width: 100%; padding: 12px;
+  border: 1px solid var(--line); border-radius: 15px; background: var(--card);
+  text-align: start; color: var(--ink); font: inherit; box-shadow: var(--shadow);
+}
+.mbl-row:active { transform: scale(.995); }
+.mbl-thumb {
+  flex-shrink: 0; width: 54px; height: 54px; border-radius: 11px; overflow: hidden;
+  background: var(--bg); display: grid; place-items: center; color: var(--line);
+}
+.mbl-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.mbl-bd { flex: 1; min-width: 0; display: grid; gap: 3px; }
+.mbl-bd .t {
+  font-size: 15px; font-weight: 750; line-height: 1.3;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.mbl-bd .s { font-size: 12.5px; color: var(--muted); font-weight: 650; }
+.mbl-bd .s b { color: var(--ink-2); }
+.mbl-row > svg { flex-shrink: 0; color: var(--line); }
+
+/* Pastilles d'état. */
+.mbl-tag {
+  display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px;
+  border-radius: 999px; font-size: 11px; font-weight: 800; letter-spacing: .01em;
+  background: var(--bg); color: var(--ink-2);
+}
+.mbl-tag.ok { background: #ECFDF3; color: #15803D; }
+.mbl-tag.off { background: #F3F4F6; color: #6B7280; }
+.mbl-tag.warn { background: #FFFBEB; color: #92400E; }
+.mbl-tag.info { background: #EFF6FF; color: #1D4ED8; }
+.mbl-tag.hot { background: var(--o-soft); color: var(--o-dark); }
+
+/* Filtres en ligne (Tous · Visibles · Masqués). */
+.mbl-seg {
+  display: flex; gap: 7px; overflow-x: auto; padding-bottom: 2px;
+  scrollbar-width: none; -ms-overflow-style: none;
+}
+.mbl-seg::-webkit-scrollbar { display: none; }
+.mbl-seg button {
+  flex-shrink: 0; min-height: 38px; padding: 8px 14px; border-radius: 999px;
+  border: 1px solid var(--line); background: var(--card); color: var(--ink-2);
+  font: 700 13px/1 inherit; font-family: inherit;
+}
+.mbl-seg button.on { background: var(--ink); border-color: var(--ink); color: #fff; }
+
+/* Bouton flottant « + » (nouveau produit, nouvelle marque…). */
+.mbl-fab {
+  position: fixed; z-index: 27; inset-inline-end: 16px;
+  bottom: calc(var(--tabbar) + env(safe-area-inset-bottom, 0px) + 16px);
+  width: 56px; height: 56px; border-radius: 50%; border: 0;
+  background: var(--o); color: #fff; display: grid; place-items: center;
+  box-shadow: 0 8px 24px rgba(255, 90, 31, .42);
+}
+.mb.solo .mbl-fab { bottom: calc(env(safe-area-inset-bottom, 0px) + 16px); }
+
+/* En-tête de page secondaire, avec retour. */
+.mb-sub-top {
+  position: sticky; top: 0; z-index: 20;
+  display: flex; align-items: center; gap: 10px; padding: 11px 12px;
+  background: rgba(245, 246, 250, .92);
+  backdrop-filter: saturate(180%) blur(14px);
+  -webkit-backdrop-filter: saturate(180%) blur(14px);
+  border-bottom: 1px solid var(--line);
+  padding-top: calc(11px + env(safe-area-inset-top, 0px));
+}
+.mb-sub-top .back {
+  flex-shrink: 0; width: 40px; height: 40px; border: 0; border-radius: 11px;
+  background: var(--card); color: var(--ink); display: grid; place-items: center;
+  border: 1px solid var(--line);
+}
+.mb-sub-top .ttl { flex: 1; min-width: 0; display: grid; gap: 1px; }
+.mb-sub-top h1 {
+  margin: 0; font-size: 17px; font-weight: 800; color: var(--ink); line-height: 1.2;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.mb-sub-top p { margin: 0; font-size: 12px; font-weight: 650; color: var(--muted); }
+
+/* Menu « Plus » : grandes lignes tapables vers les écrans secondaires. */
+.mb-menu { display: grid; gap: 9px; }
+.mb-menu a {
+  display: flex; align-items: center; gap: 13px; padding: 15px;
+  border: 1px solid var(--line); border-radius: 15px; background: var(--card);
+  color: var(--ink); text-decoration: none; box-shadow: var(--shadow);
+}
+.mb-menu a .ic {
+  flex-shrink: 0; width: 40px; height: 40px; border-radius: 11px;
+  display: grid; place-items: center; color: #fff;
+}
+.mb-menu a .bd { flex: 1; display: grid; gap: 2px; }
+.mb-menu a .bd b { font-size: 15.5px; font-weight: 750; }
+.mb-menu a .bd small { font-size: 12.5px; color: var(--muted); font-weight: 650; line-height: 1.4; }
+.mb-menu a > svg:last-child { color: var(--line); }
+
+@media (max-width: 360px) {
+  .mbp-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* Les lignes de liste contiennent des liens : on neutralise le style natif du
+   navigateur, sinon le nom du produit est souligné en bleu. */
+.mbl-row a { text-decoration: none; color: inherit; }
+.mbl-row .mbl-bd { align-content: center; }
+
+/* Ligne de caractéristique : « nom | valeur | retirer ». Deux champs et une
+   corbeille tiennent sur la largeur d'un téléphone à condition de ne pas
+   répéter les intitulés — d'où les aria-label côté composant. */
+.mbs-row { display: grid; grid-template-columns: 1fr 1fr auto; gap: 7px; align-items: start; }
+.mbs-row .del {
+  width: 46px; height: 46px; border: 1px solid var(--line); border-radius: 12px;
+  background: var(--card); color: var(--muted); display: grid; place-items: center;
+}
+@media (max-width: 360px) {
+  .mbs-row { grid-template-columns: 1fr auto; }
+  .mbs-row .mbf-field:first-child { grid-column: 1 / -1; }
+}
