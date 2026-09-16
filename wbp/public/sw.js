@@ -17,14 +17,18 @@
    incrémenter VERSION ci-dessous.
    ============================================================================ */
 
-const VERSION = 'wbp-mobile-v1';
+const VERSION = 'wbp-mobile-v2';
 const SHELL = `${VERSION}-shell`;
 const ASSETS = `${VERSION}-assets`;
 
 // Pages et images indispensables au premier affichage hors connexion.
+//
+// /mobile/activity n'est PAS pré-chargé : cet écran n'existe que pour le
+// propriétaire du site, et il n'y a pas de raison de déposer sa page dans le
+// cache des téléphones de toute l'équipe. Il est mis en cache normalement, à la
+// première visite de celui qui y a droit (navigation = réseau puis cache).
 const PRECACHE = [
   '/mobile',
-  '/mobile/activity',
   '/app-icon-192.png',
   '/app-icon-512.png',
   '/logos/wbp1.png',

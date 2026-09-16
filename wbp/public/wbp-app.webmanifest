@@ -1,7 +1,7 @@
 {
   "name": "WBP — Espace équipe",
   "short_name": "WBP",
-  "description": "Statistiques du site et journal d'activité de l'équipe World Business Plus.",
+  "description": "Statistiques du site World Business Plus, pour l'équipe.",
   "id": "/mobile",
   "start_url": "/mobile",
   "scope": "/mobile",
@@ -18,7 +18,6 @@
     { "src": "/app-icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ],
   "shortcuts": [
-    { "name": "Statistiques", "url": "/mobile", "icons": [{ "src": "/app-icon-192.png", "sizes": "192x192" }] },
-    { "name": "Activité", "url": "/mobile/activity", "icons": [{ "src": "/app-icon-192.png", "sizes": "192x192" }] }
+    { "name": "Statistiques", "url": "/mobile", "icons": [{ "src": "/app-icon-192.png", "sizes": "192x192" }] }
   ]
 }

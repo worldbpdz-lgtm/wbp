@@ -45,6 +45,13 @@ html, body {
   padding-bottom: calc(var(--tabbar) + env(safe-area-inset-bottom, 0px));
 }
 
+/* Application d'un administrateur normal : un seul écran, donc pas de barre
+   d'onglets — et pas de place à lui réserver en bas de la page. Une barre à un
+   seul onglet ne sert à rien et se signale toute seule comme un manque. */
+.mb.solo {
+  padding-bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+}
+
 /* ---------------------------------------------------------------- en-tête -- */
 .mb-top {
   position: sticky;

@@ -21,6 +21,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 const PREFIX = 'wbp.mobile.';
 
 export function readCache(key) {
+  if (!key) return null;
   try {
     const raw = localStorage.getItem(PREFIX + key);
     if (!raw) return null;
@@ -31,6 +32,7 @@ export function readCache(key) {
 }
 
 export function writeCache(key, data) {
+  if (!key) return;
   try {
     localStorage.setItem(PREFIX + key, JSON.stringify({ at: new Date().toISOString(), data }));
   } catch { /* quota plein ou stockage refusé : on continue sans cache */ }
@@ -46,6 +48,11 @@ export function clearCache() {
 // Hook « cache d'abord, réseau ensuite ».
 // status : 'fresh' (réponse du serveur) · 'cached' (mémoire du téléphone)
 //          · 'empty' (rien encore) · 'offline' · 'error' · 'unauthorized'
+//
+// `url` à null met le hook en veille : ni lecture du cache, ni appel réseau.
+// C'est ce qui permet à un écran réservé de ne rien demander tant que le rôle
+// du compte n'est pas établi — un 403 inutile dans les journaux du serveur, et
+// une requête de plus au démarrage, pour un écran qu'on ne montrera pas.
 // ----------------------------------------------------------------------------
 export function useCached(key, url) {
   const [data, setData] = useState(null);
@@ -65,6 +72,7 @@ export function useCached(key, url) {
   }, [key]);
 
   const refresh = useCallback(async () => {
+    if (!url) return;
     setBusy(true);
     try {
       const res = await fetch(url, { cache: 'no-store', credentials: 'same-origin' });

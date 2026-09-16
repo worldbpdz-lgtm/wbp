@@ -1,6 +1,7 @@
 'use client';
-import React, { useMemo, useState } from 'react';
-import { TopBar } from '@/components/mobile/MobileApp';
+import React, { useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { TopBar, useMobile } from '@/components/mobile/MobileApp';
 import { Icon, Skeleton, fmt } from '@/components/mobile/ui';
 import { agoOf, dayKeyOf, dayLabelOf, timeOf, useCached } from '@/components/mobile/store';
 
@@ -9,6 +10,12 @@ import { agoOf, dayKeyOf, dayLabelOf, timeOf, useCached } from '@/components/mob
 // ----------------------------------------------------------------------------
 // Une ligne par action du back-office, groupée par journée. Les puces du haut
 // filtrent sur une personne ; le sélecteur choisit la fenêtre (7 / 30 / 90 j).
+//
+// ÉCRAN RÉSERVÉ AU PROPRIÉTAIRE. Les administrateurs normaux n'ont pas cet
+// onglet dans leur application ; s'ils arrivent ici par une adresse mémorisée
+// ou un raccourci, on les renvoie aux statistiques. La vraie barrière reste
+// /api/mobile/activity, qui leur répond 403 : ce composant ne fait que la
+// courtoisie de ne pas afficher un écran d'erreur.
 //
 // Les heures et les journées sont calculées ICI, sur le téléphone, avec le
 // fuseau d'Alger : le serveur tourne en UTC sur Vercel, et regrouper côté
@@ -21,13 +28,25 @@ const WINDOWS = [[7, '7 j'], [30, '30 j'], [90, '90 j']];
 export default function ActivityScreen() {
   const [days, setDays] = useState(30);
   const [actor, setActor] = useState(null);
+  const { role } = useMobile();
+  const router = useRouter();
+
+  // 'unknown' = rôle pas encore établi : on attend sans rien demander ni rien
+  // afficher, plutôt que de renvoyer le propriétaire hors de son propre écran.
+  useEffect(() => {
+    if (role === 'admin') router.replace('/mobile');
+  }, [role, router]);
 
   // On récupère TOUTE la fenêtre et on filtre par personne sur le téléphone.
   // Deux raisons : les compteurs des puces restent justes quand un filtre est
   // actif (sinon les autres comptes tomberaient à zéro), et changer de personne
   // devient instantané, même sans réseau.
-  const key = `activity.${days}`;
-  const { data, status, cachedAt, busy, refresh } = useCached(key, `/api/mobile/activity?days=${days}`);
+  const allowed = role === 'owner';
+  const key = allowed ? `activity.${days}` : null;
+  const { data, status, cachedAt, busy, refresh } = useCached(
+    key,
+    allowed ? `/api/mobile/activity?days=${days}` : null,
+  );
 
   const items = useMemo(
     () => (data?.items || []).filter((it) => !actor || it.email === actor),
@@ -51,6 +70,17 @@ export default function ActivityScreen() {
 
   const people = data?.people || [];
   const total = items.length;
+
+  // Compte non propriétaire (ou rôle encore inconnu) : rien du tout. Pas de
+  // titre, pas de message d'erreur, pas d'indice qu'un journal existe — juste
+  // l'écran de chargement le temps de la redirection.
+  if (!allowed) {
+    return (
+      <div className="mb-wrap">
+        <Skeleton h={62} /><Skeleton h={62} /><Skeleton h={62} />
+      </div>
+    );
+  }
 
   return (
     <>

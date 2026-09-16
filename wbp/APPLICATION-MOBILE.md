@@ -1,9 +1,19 @@
 # Application mobile « WBP »
 
-Application pour l'équipe, installée sur l'écran d'accueil de l'iPhone.
-Deux écrans : **Stats** (le trafic du site et les demandes de devis, les mêmes
-chiffres que `/admin`) et **Activité** (qui a fait quoi dans le back-office,
-quel jour, à quelle heure).
+Application pour l'équipe, installée sur l'écran d'accueil de l'iPhone. Une
+seule application, la même adresse pour tout le monde, mais deux versions selon
+le compte qui se connecte :
+
+| | **Stats** — trafic du site et demandes de devis, les mêmes chiffres que `/admin` | **Activité** — qui a fait quoi dans le back-office, quel jour, à quelle heure |
+|---|---|---|
+| **Propriétaire** (1ʳᵉ adresse d'`ADMIN_EMAILS`) | oui | oui |
+| **Administrateur normal** (toutes les autres) | oui | — |
+
+Pour un administrateur normal, l'onglet Activité **n'existe pas** : pas de barre
+d'onglets du tout, juste l'écran des statistiques. Il ne peut pas non plus y
+accéder en tapant l'adresse à la main — le serveur refuse la requête. Le journal
+continue d'enregistrer ses actions comme celles de tout le monde ; ce qui change,
+c'est qui peut le lire.
 
 Adresse : **`https://VOTRE-DOMAINE/mobile`**
 
@@ -21,8 +31,12 @@ d'adresse.
 2. Toucher le bouton **Partager** (le carré avec la flèche vers le haut).
 3. Faire défiler et choisir **« Sur l'écran d'accueil »**, puis **Ajouter**.
 
-L'icône **WBP** apparaît sur l'écran d'accueil. À la première ouverture,
-l'écran orange « Welcome Cherif » s'affiche, puis l'écran de connexion.
+L'icône **WBP** apparaît sur l'écran d'accueil. À la première ouverture, l'écran
+orange « Welcome » s'affiche, puis l'écran de connexion. Aux ouvertures
+suivantes, le prénom du compte de ce téléphone est ajouté : « Welcome Cherif »,
+« Welcome Abdenour »… Le prénom vient du nom du compte (voir `ADMIN_NAMES`
+ci-dessous) et il est gardé sur le téléphone, donc il s'affiche tout de suite,
+avant même que le réseau réponde.
 
 > Sur Android, c'est le même principe : Chrome propose « Installer
 > l'application » ou « Ajouter à l'écran d'accueil ».
@@ -33,7 +47,20 @@ l'écran orange « Welcome Cherif » s'affiche, puis l'écran de connexion.
 
 Les comptes de l'application sont **les mêmes** que ceux du back-office
 `/admin` : un utilisateur Supabase Auth, dont l'adresse figure dans la variable
-`ADMIN_EMAILS`. Tous ont les mêmes droits (administrateur).
+`ADMIN_EMAILS`. Tous ont exactement les mêmes droits sur le site — ajouter un
+produit, traiter un devis, envoyer une campagne.
+
+**L'ordre d'`ADMIN_EMAILS` compte.** La première adresse de la liste est le
+compte **propriétaire** : le seul dont l'application mobile affiche l'onglet
+Activité. Les suivantes sont des administrateurs normaux.
+
+```
+ADMIN_EMAILS=cherif@wbp-dz.com,abdenour@wbp-dz.com,sara@wbp-dz.com
+              └─ propriétaire ──┘ └────── administrateurs normaux ──────┘
+```
+
+Pour changer de propriétaire, il suffit de placer son adresse en tête de la
+variable et de redéployer. Aucun code à toucher, aucune autre variable à créer.
 
 **Ajouter une personne :**
 
@@ -49,7 +76,8 @@ compte Supabase existe encore. Son historique reste dans le journal.
 
 Le nom affiché est déduit de l'adresse (`abdenour@wbp-dz.com` → « Abdenour »).
 Pour une adresse qui ne ressemble pas au prénom, renseigner la variable
-facultative `ADMIN_NAMES` au format `email:Nom,email:Nom`.
+facultative `ADMIN_NAMES` au format `email:Nom,email:Nom`. C'est ce nom qui
+apparaît dans le journal **et** sur l'écran d'ouverture de son téléphone.
 
 ---
 
@@ -65,11 +93,15 @@ Installation, une seule fois : double-clic sur **`apply-activity.bat`** à la
 racine du projet. Tant que ce n'est pas fait, l'onglet Activité affiche un
 message le rappelant — le reste du site continue de fonctionner normalement.
 
-Deux garde-fous :
+Trois garde-fous :
 
 - La table est en **Row Level Security sans aucune policy** : personne ne peut
   la lire ni l'écrire depuis le navigateur, même connecté. Seul le serveur y
   accède. Un journal que la personne surveillée peut effacer ne sert à rien.
+- **Seul le propriétaire le lit.** `/api/mobile/activity` vérifie que le compte
+  connecté est la première adresse d'`ADMIN_EMAILS` et répond `403` à tous les
+  autres. C'est le serveur qui décide : masquer l'onglet sur le téléphone ne
+  protégerait rien, puisque n'importe qui peut taper une adresse.
 - Journaliser ne peut jamais faire échouer l'action journalisée : si la base
   est injoignable, l'action de l'administrateur passe quand même.
 
@@ -103,12 +135,14 @@ Après un déploiement qui modifie l'app, incrémenter `VERSION` en haut de
 ## 5) Fichiers
 
 ```
-app/mobile/                    Les deux écrans (Stats, Activité)
+app/mobile/                    Les écrans (Stats, et Activité pour le propriétaire)
 app/mobile/layout.js           Nom « WBP », icône, plein écran iOS
+app/api/mobile/me/             Nom affiché + rôle du compte connecté
 app/api/mobile/stats/          Chiffres — appelle getDashboard()/getAnalytics()
-app/api/mobile/activity/       Journal — appelle getActivity()
+app/api/mobile/activity/       Journal — réservé au propriétaire
 components/mobile/             Coquille, écran d'ouverture, connexion, graphiques
 styles/mobile.css              Feuille de style autonome de l'app
+lib/admin.js                   Qui est administrateur · qui est propriétaire
 lib/activity.js                Écriture et lecture du journal
 public/wbp-app.webmanifest     Manifeste d'installation
 public/sw.js                   Mode hors connexion
