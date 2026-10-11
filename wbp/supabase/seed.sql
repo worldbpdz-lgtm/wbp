@@ -79,8 +79,8 @@ on conflict do nothing;
 -- non plus (key) seule. Un « on conflict (key) » échouerait désormais avec
 -- « no unique or exclusion constraint matching the ON CONFLICT specification ».
 insert into settings (site, key, value) values
-  ('wbp', 'whatsapp', '"213559533698"'::jsonb),
-  ('wbp', 'contact', '{"email":"commercial@wbp-dz.com","phones":["0559 533 698","0560 061 082"],"fax":"Tél/Fax : 023 70 80 21","address":{"fr":"Cité DNC G8, Bt D, N°07, Garidi 1, Kouba, 16006 Alger, Algérie","en":"Cité DNC G8, Bt D, N°07, Garidi 1, Kouba, 16006 Algiers, Algeria","ar":"حي DNC G8، عمارة D، رقم 07، قاريدي 1، القبة، 16006 الجزائر العاصمة"}}'::jsonb),
+  ('wbp', 'whatsapp', '"213560018206"'::jsonb),
+  ('wbp', 'contact', '{"email":"commercial@wbp-dz.com","phones":["0560 01 82 06","0560 061 082"],"fax":"Tél/Fax : 023 70 80 21","address":{"fr":"Cité DNC G8, Bt D, N°07, Garidi 1, Kouba, 16006 Alger, Algérie","en":"Cité DNC G8, Bt D, N°07, Garidi 1, Kouba, 16006 Algiers, Algeria","ar":"حي DNC G8، عمارة D، رقم 07، قاريدي 1، القبة، 16006 الجزائر العاصمة"}}'::jsonb),
   ('wbp', 'hero', '{"fr":{"title":"","sub":""},"en":{"title":"","sub":""},"ar":{"title":"","sub":""}}'::jsonb)
 on conflict (site, key) do nothing;
 

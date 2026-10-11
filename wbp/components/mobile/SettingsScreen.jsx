@@ -229,7 +229,7 @@ export default function SettingsScreen({ settings, clients = [] }) {
         <Group title="WhatsApp & contact" note="Ces informations s’affichent dans le pied de page et sur la page Contact du site.">
           <TextInput
             label="Numéro WhatsApp"
-            hint="Format international, sans le +. Exemple : 213559533698."
+            hint="Format international, sans le +. Exemple : 213560018206."
             value={wa}
             onChange={setWa}
             inputMode="numeric"

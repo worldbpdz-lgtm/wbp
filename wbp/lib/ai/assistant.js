@@ -167,7 +167,7 @@ export async function answer(message, lang = 'fr') {
   // Coordonnées
   if (CONTACT_WORDS.some((w) => nq.includes(w))) {
     const c = {
-      phones: contact.phones || ['0559 533 698', '0560 061 082'],
+      phones: contact.phones || ['0560 01 82 06', '0560 061 082'],
       email: contact.email || 'commercial@wbp-dz.com',
       address: contact.address || {},
     };

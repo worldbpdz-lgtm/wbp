@@ -1,8 +1,8 @@
 // Central contact / business config. Override via env where useful.
-export const WHATSAPP = process.env.NEXT_PUBLIC_WHATSAPP || '213559533698';
+export const WHATSAPP = process.env.NEXT_PUBLIC_WHATSAPP || '213560018206';
 export const CONTACT = {
   emailDisplay: 'commercial@wbp-dz.com',
-  phones: ['0559 533 698', '0560 061 082'],
+  phones: ['0560 01 82 06', '0560 061 082'],
   faxLine: 'Tél/Fax : 023 70 80 21',
-  tel: '+213559533698',
+  tel: '+213560018206',
 };

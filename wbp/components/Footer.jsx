@@ -5,6 +5,9 @@ import { Icon } from '@/components/primitives';
 import { subscribeNewsletter } from '@/app/actions';
 import { CONTACT } from '@/lib/config';
 
+// 213560018206 → « +213 560 01 82 06 »
+const fmtPhone = (n = '') => { const d = String(n).replace(/\D/g, ''); return d.length === 12 ? `+${d.slice(0, 3)} ${d.slice(3, 6)} ${d.slice(6, 8)} ${d.slice(8, 10)} ${d.slice(10)}` : `+${d}`; };
+
 export default function Footer() {
   const { t, lang, nav, wbp, settings, theme } = useApp();
   const [sub, setSub] = useState(false);
@@ -22,7 +25,7 @@ export default function Footer() {
           </button>
           <p className="ftr-slogan">{t('foot_tag')}</p>
           <div className="ftr-contact">
-            <a href={`https://wa.me/${wbp.WHATSAPP}`} target="_blank" rel="noopener noreferrer" className="ftr-wa"><Icon name="whatsapp" size={16} /> +213 559 533 698</a>
+            <a href={`https://wa.me/${wbp.WHATSAPP}`} target="_blank" rel="noopener noreferrer" className="ftr-wa"><Icon name="whatsapp" size={16} /> {fmtPhone(wbp.WHATSAPP)}</a>
             <span><Icon name="mail" size={15} /> {settings?.contact?.email || CONTACT.emailDisplay}</span>
             <span><Icon name="pin" size={15} /> Garidi 1, Kouba — Alger</span>
           </div>

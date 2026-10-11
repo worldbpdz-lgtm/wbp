@@ -69,7 +69,7 @@ export default function SettingsManager({ settings, clients }) {
         <h2 style={{ marginTop: 0, fontSize: 16 }}>WhatsApp & contact</h2>
         <div className="adm-form">
           <div className="adm-grid2">
-            <label>Numéro WhatsApp (format international, sans +)<input value={wa} onChange={(e) => setWa(e.target.value)} placeholder="213559533698" /></label>
+            <label>Numéro WhatsApp (format international, sans +)<input value={wa} onChange={(e) => setWa(e.target.value)} placeholder="213560018206" /></label>
             <label>E-mail<input value={c.email} onChange={(e) => setC({ ...c, email: e.target.value })} /></label>
           </div>
           <div className="adm-grid2">
