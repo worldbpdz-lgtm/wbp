@@ -21,6 +21,13 @@ export const metadata = { title: 'Plus — WBP' };
 
 const ITEMS = [
   {
+    href: '/mobile/notifications',
+    icon: 'bell',
+    color: '#FF5A1F',
+    title: 'Notifications',
+    note: 'Être alerté sur ce téléphone à chaque commande, devis ou question d’un client.',
+  },
+  {
     href: '/mobile/reviews',
     icon: 'star',
     color: '#F59E0B',

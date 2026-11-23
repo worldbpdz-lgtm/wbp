@@ -8,22 +8,10 @@ export const dynamic = 'force-dynamic';
 
 const STATUSES = ['subscribed', 'pending', 'unsubscribed', 'bounced'];
 const LABEL = { subscribed: 'Abonné', pending: 'En attente', unsubscribed: 'Désinscrit', bounced: 'Rejeté' };
-const TONE = {
-  subscribed: { bg: 'rgba(31,157,85,.12)', fg: '#1f8a4c' },
-  pending: { bg: 'rgba(255,159,28,.16)', fg: '#b9740a' },
-  unsubscribed: { bg: 'rgba(22,18,14,.08)', fg: '#6E655C' },
-  bounced: { bg: 'rgba(229,72,77,.12)', fg: '#c0392b' },
-};
-const chipStyle = (on) => ({
-  display: 'inline-flex', gap: 6, alignItems: 'center', padding: '7px 13px', borderRadius: 999,
-  border: '1px solid var(--line, rgba(22,18,14,.12))', textDecoration: 'none', fontSize: 13, fontWeight: 600,
-  background: on ? '#16120E' : '#fff', color: on ? '#fff' : '#6E655C',
-});
-const inputStyle = { width: '100%', height: 42, padding: '0 14px', borderRadius: 10, border: '1px solid rgba(22,18,14,.14)', fontSize: 14, outline: 'none', background: '#fff' };
+const TONE_CLASS = { subscribed: 'ok', pending: 'warn', unsubscribed: 'off', bounced: 'bad' };
 
 function Badge({ status }) {
-  const tone = TONE[status] || TONE.unsubscribed;
-  return <span style={{ display: 'inline-block', padding: '3px 10px', borderRadius: 999, fontSize: 12, fontWeight: 700, background: tone.bg, color: tone.fg }}>{LABEL[status] || status}</span>;
+  return <span className={`st ${TONE_CLASS[status] || 'off'}`}>{LABEL[status] || status}</span>;
 }
 
 export default async function Subscribers({ searchParams }) {
@@ -67,16 +55,16 @@ export default async function Subscribers({ searchParams }) {
         <a className="adm-btn" href="/api/admin/subscribers-export">Exporter CSV</a>
       </div>
 
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', margin: '16px 0' }}>
-        <Link style={chipStyle(!status)} href={qs('')}>Tous <b>{total}</b></Link>
+      <div className="crm-chips" style={{ margin: '4px 0 14px' }}>
+        <Link className={`crm-chip ${(!status) ? 'on' : ''}`} href={qs('')}>Tous <b>{total}</b></Link>
         {STATUSES.map((st) => (
-          <Link key={st} style={chipStyle(status === st)} href={qs(st)}>{LABEL[st]} <b>{counts[st]}</b></Link>
+          <Link key={st} className={`crm-chip ${(status === st) ? 'on' : ''}`} href={qs(st)}>{LABEL[st]} <b>{counts[st]}</b></Link>
         ))}
       </div>
 
-      <form style={{ marginBottom: 14 }} action="/admin/subscribers" method="get">
+      <form className="crm-search" style={{ margin: '0 0 14px', width: '100%' }} action="/admin/subscribers" method="get">
         {status && <input type="hidden" name="status" value={status} />}
-        <input name="q" defaultValue={q} placeholder="Rechercher un e-mail…" style={inputStyle} />
+        <input name="q" defaultValue={q} placeholder="Rechercher un e-mail…" style={{ flex: 1 }} />
       </form>
 
       <div className="adm-panel">

@@ -20,7 +20,7 @@ export async function getDashboard() {
   try {
     const sb = createAdminClient();
     const since = new Date(Date.now() - 30 * DAY).toISOString();
-    const [ev, quotes, msgs, reviews, products, cats, subsRes] = await Promise.all([
+    const [ev, quotes, msgs, reviews, products, cats, subsRes, ordersRes] = await Promise.all([
       selectAll(() => sb.from('events').select('type,product_id,device,session_id,created_at').eq('site', SITE).gte('created_at', since).order('created_at', { ascending: false }).order('id', { ascending: false }), { max: EVENTS_MAX }),
       sb.from('quote_requests').select('id,customer_name,company,email,status,created_at').eq('site', SITE).order('created_at', { ascending: false }).limit(2000),
       sb.from('contact_messages').select('id,name,subject,status,created_at').eq('site', SITE).order('created_at', { ascending: false }).limit(2000),
@@ -30,8 +30,12 @@ export async function getDashboard() {
       selectAll(() => sb.from('products').select('id,name,cat,active').order('id')),
       sb.from('categories').select('id,name'),
       sb.from('newsletter_subscribers').select('id', { count: 'exact', head: true }).eq('site', SITE),
+      // Commandes : table absente tant que la migration n'est pas appliquée —
+      // l'erreur est alors ignorée et les indicateurs restent à zéro.
+      sb.from('orders').select('id,number,status,total,customer_name,company,created_at').eq('site', SITE).order('created_at', { ascending: false }).limit(3000),
     ]);
     const events = ev.data || [], Q = quotes.data || [], M = msgs.data || [], R = reviews.data || [], P = products.data || [], C = cats.data || [];
+    const O = ordersRes.error ? [] : (ordersRes.data || []);
     const pname = Object.fromEntries(P.map((p) => [p.id, p.name]));
     const cname = Object.fromEntries(C.map((c) => [c.id, c.name?.fr || c.id]));
 
@@ -48,6 +52,11 @@ export async function getDashboard() {
 
     const visitsByDay = days14.map((d) => pv.filter((e) => ymd(e.created_at) === d).reduce((a) => a + 1, 0));
     const leadsByDay = days14.map((d) => Q.filter((q) => ymd(q.created_at) === d).length);
+    const ordersByDay = days14.map((d) => O.filter((o) => ymd(o.created_at) === d).length);
+    const REVENUE = ['confirmed', 'preparing', 'shipped', 'delivered'];
+    const o30 = inLast(O, 30);
+    const revenue30 = o30.filter((o) => REVENUE.includes(o.status)).reduce((a, o) => a + (Number(o.total) || 0), 0);
+    const revenuePrev = inPrev(O, 30).filter((o) => REVENUE.includes(o.status)).reduce((a, o) => a + (Number(o.total) || 0), 0);
 
     const topProd = Object.entries(tally(prodViews, (e) => e.product_id)).sort((a, b) => b[1] - a[1]).slice(0, 6)
       .map(([id, v]) => ({ label: pname[id] || id, value: v }));
@@ -56,11 +65,14 @@ export async function getDashboard() {
     const reviewDist = [5, 4, 3, 2, 1].map((s) => ({ s, n: R.filter((r) => Math.round(r.rating) === s).length }));
     const qStatus = tally(Q, (q) => q.status);
 
+    // Chaque ligne du fil mène à sa fiche : `href` pour le back-office web,
+    // `mhref` pour l'application mobile.
     const activity = [
-      ...Q.slice(0, 6).map((q) => ({ kind: 'quote', icon: 'cart', color: '#7c3aed', text: `Devis — ${q.customer_name || q.email || 'client'}`, time: q.created_at })),
-      ...M.slice(0, 6).map((m) => ({ kind: 'msg', icon: 'mail', color: '#2563eb', text: `Message — ${m.name || m.subject || ''}`, time: m.created_at })),
-      ...R.slice(0, 6).map((r) => ({ kind: 'review', icon: 'star', color: '#d97706', text: `Avis ${r.rating}★ — ${pname[r.product_id] || r.product_id}`, time: r.created_at })),
-    ].sort((a, b) => new Date(b.time) - new Date(a.time)).slice(0, 9);
+      ...O.slice(0, 6).map((o) => ({ kind: 'order', icon: 'truck', color: '#1F9D55', text: `Commande ${o.number || ''} — ${o.company || o.customer_name || 'client'}`, time: o.created_at, href: `/admin/orders/${o.id}`, mhref: `/mobile/orders/${o.id}` })),
+      ...Q.slice(0, 6).map((q) => ({ kind: 'quote', icon: 'cart', color: '#7c3aed', text: `Devis — ${q.customer_name || q.company || q.email || 'client'}`, time: q.created_at, href: `/admin/quotes/${q.id}`, mhref: `/mobile/inbox?open=quote:${q.id}` })),
+      ...M.slice(0, 6).map((m) => ({ kind: 'msg', icon: 'mail', color: '#2563eb', text: `Message — ${m.name || m.subject || ''}`, time: m.created_at, href: `/admin/messages/${m.id}`, mhref: `/mobile/inbox?open=message:${m.id}` })),
+      ...R.slice(0, 6).map((r) => ({ kind: 'review', icon: 'star', color: '#d97706', text: `Avis ${r.rating}★ — ${pname[r.product_id] || r.product_id}`, time: r.created_at, href: r.approved ? '/admin/reviews' : '/admin/reviews?status=pending', mhref: '/mobile/reviews' })),
+    ].sort((a, b) => new Date(b.time) - new Date(a.time)).slice(0, 10);
 
     return {
       kpis: {
@@ -73,8 +85,14 @@ export async function getDashboard() {
         reviewsPending: { n: R.filter((r) => !r.approved).length },
         subscribers: { n: subsRes.count || 0 },
         messagesNew: { n: M.filter((m) => m.status === 'new').length },
+        ordersPending: { n: O.filter((o) => o.status === 'pending').length },
+        ordersOpen: { n: O.filter((o) => ['confirmed', 'preparing', 'shipped'].includes(o.status)).length },
+        orders30: { n: o30.filter((o) => o.status !== 'cancelled').length },
+        revenue30: { n: Math.round(revenue30), trend: trend(revenue30, revenuePrev) },
       },
-      days14, visitsByDay, leadsByDay, topProd, devices, byCat, reviewDist, qStatus, activity,
+      ordersReady: !ordersRes.error,
+      recentOrders: O.slice(0, 6),
+      days14, visitsByDay, leadsByDay, ordersByDay, topProd, devices, byCat, reviewDist, qStatus, activity,
     };
   } catch (e) { console.error('getDashboard', e?.message); return null; }
 }

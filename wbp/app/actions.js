@@ -9,11 +9,16 @@
 // (ces messages révèlent noms de tables, de colonnes et de contraintes).
 // ============================================================================
 import { randomUUID } from 'node:crypto';
+import { after } from 'next/server';
 import { createAdminClient, hasSupabase } from '@/lib/supabase/server';
 import { sendEmail, siteUrl } from '@/lib/email/send';
 import { confirmEmailHtml } from '@/lib/email/template';
 import { guard, isBot } from '@/lib/ratelimit';
 import { SITE } from '@/lib/site';
+import { normPhone, isPlausiblePhone } from '@/lib/phone';
+import { computeTotals, sanitizeLines, cleanQty } from '@/lib/pricing';
+import { linkCustomer, historyEntry, isNotMigrated } from '@/lib/crm-server';
+import { notifyNewQuote, notifyNewMessage, notifyNewReview, notifyNewOrder } from '@/lib/notify';
 
 const str = (v, max = 2000) => (v == null ? null : String(v).slice(0, max).trim() || null);
 const isEmail = (e) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e || '');
@@ -42,9 +47,28 @@ export async function submitQuote(payload) {
   };
   if (!hasSupabase()) return { ok: true, stored: false };
   const sb = createAdminClient();
-  const { error } = await sb.from('quote_requests').insert(row);
+  // select('*') et non une liste de colonnes : sur une base pas encore migrée,
+  // citer une colonne absente (number…) ferait échouer — et annuler — l'insertion.
+  const { data: saved, error } = await sb.from('quote_requests').insert(row).select('*').single();
   if (error) return oops('submitQuote', error);
-  return { ok: true, stored: true };
+  // Après la réponse au visiteur : fiche client + notification de l'équipe.
+  after(() => linkAndNotify(sb, 'quote_requests', saved, { name: row.customer_name, company: row.company, phone: row.phone, email: row.email }, notifyNewQuote));
+  return { ok: true, stored: true, number: saved?.number || null };
+}
+
+// Rattache la demande à sa fiche client, puis prévient l'équipe. Appelé dans
+// `after()` : le visiteur a déjà sa confirmation, rien ici ne peut la lui retirer.
+async function linkAndNotify(sb, table, saved, contact, notifyFn) {
+  try {
+    if (saved?.id) {
+      const cid = await linkCustomer(sb, contact, { source: 'website' });
+      if (cid) {
+        const { error } = await sb.from(table).update({ customer_id: cid }).eq('id', saved.id);
+        if (!error) saved.customer_id = cid;
+      }
+    }
+  } catch (e) { console.warn(`[${table}] fiche client:`, e?.message); }
+  try { if (saved) await notifyFn(saved); } catch (e) { console.warn(`[${table}] notification:`, e?.message); }
 }
 
 export async function submitContact(payload) {
@@ -59,8 +83,9 @@ export async function submitContact(payload) {
   };
   if (!hasSupabase()) return { ok: true, stored: false };
   const sb = createAdminClient();
-  const { error } = await sb.from('contact_messages').insert(row);
+  const { data: saved, error } = await sb.from('contact_messages').insert(row).select('*').single();
   if (error) return oops('submitContact', error);
+  after(() => linkAndNotify(sb, 'contact_messages', saved, { name: row.name, company: row.company, phone: row.phone, email: row.email }, notifyNewMessage));
   return { ok: true, stored: true };
 }
 
@@ -82,9 +107,139 @@ export async function submitReview(payload) {
   };
   if (!hasSupabase()) return { ok: true, stored: false };
   const sb = createAdminClient();
-  const { error } = await sb.from('reviews').insert(row);
+  const { data: saved, error } = await sb.from('reviews').insert(row).select('*').single();
   if (error) return oops('submitReview', error);
+  after(async () => {
+    try {
+      const { data: p } = await sb.from('products').select('name').eq('id', row.product_id).maybeSingle();
+      await notifyNewReview(saved, p?.name);
+    } catch (e) { console.warn('[submitReview] notification:', e?.message); }
+  });
   return { ok: true, stored: true, pending: true };
+}
+
+// ============================================================================
+// COMMANDE passée depuis le panier du site.
+// ----------------------------------------------------------------------------
+// Le site reste « prix sur devis » : le client ne voit aucun prix. Sa commande
+// arrive « À confirmer » ; un conseiller l'appelle pour valider prix, stock et
+// livraison, puis la confirme dans /admin ou l'app mobile.
+//
+// Protections contre les fausses commandes (en plus du piège à robots) :
+//   • limitation de débit par adresse IP ;
+//   • 3 commandes maximum par heure et par numéro de téléphone — compté EN BASE,
+//     donc valable sur toutes les instances du serveur ;
+//   • double envoi (double clic, réseau qui hésite) : la même commande depuis le
+//     même numéro dans le quart d'heure renvoie la commande déjà enregistrée ;
+//   • les noms, références et prix viennent du catalogue en base, jamais du
+//     navigateur.
+// Si la migration n'est pas encore appliquée, la commande est enregistrée comme
+// demande de devis : aucun client n'est jamais perdu.
+// ============================================================================
+const DELIVERY = ['delivery', 'pickup', 'installation'];
+const ORDER_PER_PHONE_HOUR = 3;
+
+export async function submitOrder(payload = {}) {
+  const limited = await guard('order', { limit: 4, windowMs: 10 * 60_000 });
+  if (limited) return limited;
+  if (isBot(payload)) return { ok: true, stored: false, number: null };
+
+  const name = str(payload.customer_name, 200);
+  const phone = str(payload.phone, 60);
+  const email = str(payload.email, 200);
+  if (!name) return { ok: false, error: 'invalid_name' };
+  if (!isPlausiblePhone(phone)) return { ok: false, error: 'invalid_phone' };
+  if (email && !isEmail(email)) return { ok: false, error: 'invalid_email' };
+  const raw = Array.isArray(payload.items) ? payload.items.slice(0, 60) : [];
+  if (!raw.length) return { ok: false, error: 'empty_cart' };
+
+  const contact = {
+    customer_name: name,
+    company: str(payload.company, 200),
+    phone,
+    email,
+    wilaya: str(payload.wilaya, 80),
+    city: str(payload.city, 120),
+    address: str(payload.address, 400),
+  };
+  const delivery_method = DELIVERY.includes(payload.delivery_method) ? payload.delivery_method : 'delivery';
+  const customer_note = str(payload.message, 4000);
+  if (!hasSupabase()) return { ok: true, stored: false, number: null };
+  const sb = createAdminClient();
+
+  // ---- lignes : catalogue en base, quantités du client -----------------------
+  const ids = [...new Set(raw.map((i) => str(i?.id, 60)).filter(Boolean))];
+  const { data: prods } = ids.length
+    ? await sb.from('products').select('id,name,code,price').in('id', ids)
+    : { data: [] };
+  const byId = Object.fromEntries((prods || []).map((p) => [p.id, p]));
+  const items = sanitizeLines(raw.map((i) => {
+    const p = byId[str(i?.id, 60)];
+    return {
+      product_id: p?.id || str(i?.id, 60),
+      code: p?.code || str(i?.code, 120),
+      name: p?.name || str(i?.name, 300),
+      qty: cleanQty(i?.qty),
+      // Prix de vente du catalogue s'il est renseigné : l'équipe n'a plus qu'à
+      // le confirmer. Jamais un prix venu du navigateur.
+      unit_price: p?.price != null ? Number(p.price) : null,
+    };
+  }));
+  if (!items.length) return { ok: false, error: 'empty_cart' };
+
+  // ---- anti-spam et double envoi (en base) -----------------------------------
+  const pn = normPhone(phone);
+  const signature = (list) => list.map((l) => `${l.product_id || l.code}×${l.qty}`).sort().join('|');
+  const sig = signature(items);
+  const since = new Date(Date.now() - 60 * 60_000).toISOString();
+  const recent = await sb.from('orders').select('id,number,items,created_at')
+    .eq('site', SITE).eq('phone_norm', pn).gte('created_at', since)
+    .order('created_at', { ascending: false }).limit(10);
+  if (!recent.error && recent.data?.length) {
+    const dup = recent.data.find((o) => Date.now() - new Date(o.created_at).getTime() < 15 * 60_000
+      && signature(sanitizeLines(o.items)) === sig);
+    if (dup) return { ok: true, stored: true, number: dup.number, duplicate: true };
+    if (recent.data.length >= ORDER_PER_PHONE_HOUR) return { ok: false, error: 'too_many' };
+  }
+
+  const totals = computeTotals({ items });
+  const order = {
+    site: SITE,
+    status: 'pending',
+    source: 'website',
+    ...contact,
+    delivery_method,
+    items,
+    subtotal: totals.subtotal,
+    total: totals.total,
+    customer_note,
+    history: [historyEntry(null, 'created', 'Commande passée sur le site web.')],
+  };
+
+  const { data: saved, error } = await sb.from('orders').insert(order).select('*').single();
+  if (error) {
+    if (!isNotMigrated(error)) return oops('submitOrder', error);
+    // Base pas encore migrée : la commande devient une demande de devis
+    // détaillée, pour que l'équipe la voie et rappelle le client.
+    const DL = { delivery: 'Livraison', pickup: 'Retrait au dépôt', installation: 'Livraison + installation' };
+    const note = [
+      'COMMANDE À CONFIRMER (passée sur le site)',
+      `Mode : ${DL[delivery_method]}`,
+      contact.wilaya && `Wilaya : ${contact.wilaya}`,
+      contact.address && `Adresse : ${contact.address}`,
+      customer_note && `Message : ${customer_note}`,
+    ].filter(Boolean).join('\n');
+    const fb = await sb.from('quote_requests').insert({
+      site: SITE, customer_name: name, company: contact.company, email, phone,
+      message: note.slice(0, 4000),
+      items: items.map((l) => ({ id: l.product_id, name: l.name, code: l.code, qty: l.qty })),
+    });
+    if (fb.error) return oops('submitOrder/fallback', fb.error);
+    return { ok: true, stored: true, number: null };
+  }
+
+  after(() => linkAndNotify(sb, 'orders', saved, { name, company: contact.company, phone, email, wilaya: contact.wilaya, city: contact.city, address: contact.address }, notifyNewOrder));
+  return { ok: true, stored: true, number: saved.number };
 }
 
 // Double opt-in: create/refresh a PENDING subscriber and email a confirmation link.

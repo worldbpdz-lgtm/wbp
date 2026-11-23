@@ -8,6 +8,7 @@ import { logActivity } from '@/lib/activity';
 import { SITE } from '@/lib/site';
 import { sendEmail, siteUrl } from '@/lib/email/send';
 import { wrapEmail, rewriteLinksForTracking, trackingPixel } from '@/lib/email/template';
+import { setLeadStatus } from '@/app/admin/crm-actions';
 
 const s = (v, max = 4000) => (v == null || v === '' ? null : String(v).slice(0, max));
 
@@ -353,25 +354,29 @@ async function mutate(run, paths, what) {
 // La base est partagée avec Central Network : sans ce filtre, un identifiant
 // deviné suffisait à modifier ou supprimer les devis, messages, avis et abonnés
 // de l'autre site.
+// Statuts : contrôlés contre une liste fermée et tracés dans l'historique de la
+// demande (voir setLeadStatus dans crm-actions.js). Ces deux noms restent
+// exportés pour les écrans qui les appelaient déjà.
 export async function updateQuoteStatus(id, status) {
-  await requireAdmin('updateQuoteStatus', `devis #${id} → ${status}`); const sb = createAdminClient();
-  return mutate(() => sb.from('quote_requests').update({ status: s(status, 30) }).eq('id', id).eq('site', SITE),
-    ['/admin/quotes', '/admin'], 'Cette demande');
+  return setLeadStatus('quote', id, status);
 }
 export async function deleteQuote(id) {
   await requireAdmin('deleteQuote', `devis #${id}`); const sb = createAdminClient();
-  return mutate(() => sb.from('quote_requests').delete().eq('id', id).eq('site', SITE),
-    ['/admin/quotes', '/admin'], 'Cette demande');
+  const res = await mutate(() => sb.from('quote_requests').delete().eq('id', id).eq('site', SITE),
+    ['/admin/quotes', '/admin', '/mobile/inbox'], 'Cette demande');
+  // Les notifications qui menaient à ce devis deviendraient des liens morts.
+  if (res.ok) await sb.from('notifications').delete().eq('site', SITE).eq('ref_type', 'quote').eq('ref_id', String(id)).then(() => {}, () => {});
+  return res;
 }
 export async function updateMessageStatus(id, status) {
-  await requireAdmin('updateMessageStatus', `message #${id} → ${status}`); const sb = createAdminClient();
-  return mutate(() => sb.from('contact_messages').update({ status: s(status, 30) }).eq('id', id).eq('site', SITE),
-    ['/admin/messages', '/admin'], 'Ce message');
+  return setLeadStatus('message', id, status);
 }
 export async function deleteMessage(id) {
   await requireAdmin('deleteMessage', `message #${id}`); const sb = createAdminClient();
-  return mutate(() => sb.from('contact_messages').delete().eq('id', id).eq('site', SITE),
-    ['/admin/messages', '/admin'], 'Ce message');
+  const res = await mutate(() => sb.from('contact_messages').delete().eq('id', id).eq('site', SITE),
+    ['/admin/messages', '/admin', '/mobile/inbox'], 'Ce message');
+  if (res.ok) await sb.from('notifications').delete().eq('site', SITE).eq('ref_type', 'message').eq('ref_id', String(id)).then(() => {}, () => {});
+  return res;
 }
 export async function setReviewApproved(id, approved) {
   await requireAdmin('setReviewApproved', `avis #${id} → ${approved ? 'approuvé' : 'masqué'}`); const sb = createAdminClient();
@@ -394,8 +399,14 @@ export async function deleteSubscriber(id) {
 }
 
 // ---------- Settings & clients ----------
+// Clés autorisées : la table `settings` est LISIBLE PAR TOUS (le site public en a
+// besoin). N'importe quelle clé arbitraire y deviendrait publique — on s'en tient
+// donc à la liste de ce que le site affiche réellement.
+const SETTING_KEYS = ['whatsapp', 'contact', 'hero', 'popup', 'documents'];
+
 export async function saveSetting(key, value) {
   await requireAdmin('saveSetting', key);
+  if (!SETTING_KEYS.includes(key)) return { ok: false, error: 'Réglage inconnu.' };
   const sb = createAdminClient();
   const { error } = await sb.from('settings').upsert({ site: SITE, key: s(key, 60), value, updated_at: new Date().toISOString() }, { onConflict: 'site,key' });
   if (error) return { ok: false, error: friendly(error, 'Ce réglage') };

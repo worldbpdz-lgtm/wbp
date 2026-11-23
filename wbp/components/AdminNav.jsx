@@ -3,46 +3,60 @@ import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Icon } from '@/components/primitives';
-import { signOutAction } from '@/app/admin/actions';
+import { GROUPS } from '@/components/admin/nav-model';
 
-const GROUPS = [
-  { items: [['/admin', 'Tableau de bord', 'grid'], ['/admin/analytics', 'Analytics', 'chart']] },
-  { label: 'Catalogue', items: [['/admin/products', 'Produits', 'box'], ['/admin/brands', 'Marques', 'badge'], ['/admin/categories', 'Catégories', 'layers'], ['/admin/showcase', 'Vitrine', 'bolt'], ['/admin/best-sellers', 'Meilleures ventes', 'star'], ['/admin/arrivals', 'Nouveautés', 'spark']] },
-  { label: 'Activité', items: [['/admin/quotes', 'Demandes de devis', 'cart', 'quotes'], ['/admin/messages', 'Messages', 'mail', 'messages'], ['/admin/reviews', 'Avis', 'star', 'reviews']] },
-  { label: 'E-mailing', items: [['/admin/subscribers', 'Abonnés', 'user'], ['/admin/campaigns', 'Campagnes', 'mail']] },
-  { label: 'Site', items: [['/admin/ai', 'Assistant IA', 'headset'], ['/admin/settings', 'Paramètres', 'cog']] },
-];
+// ============================================================================
+// Menu latéral du back-office.
+//   • grand écran : colonne claire, réductible en icônes seules (bouton du
+//     bas, mémorisé par un cookie — voir AdminShell) ;
+//   • petit écran : tiroir qui s'ouvre depuis le bouton ☰ de la barre du haut
+//     et se referme dès qu'on choisit une page.
+// Les pastilles comptent ce qui attend : commandes à confirmer, devis et
+// messages nouveaux, avis à modérer, notifications non lues.
+// ============================================================================
 
-export default function AdminNav({ counts = {}, email }) {
+export default function AdminNav({ counts = {}, mini = false, onToggleMini, onNavigate }) {
   const pathname = usePathname();
   return (
-    <aside className="adm-side">
+    <aside className="adm-side" aria-label="Menu du back-office">
       <div className="adm-brand">
-        {/* Barre latérale sombre → variante claire du logo (/logos/wbp.png). */}
+        {/* Fond clair → variante sombre du logo. */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <span className="m"><img src="/logos/wbp.png" alt="World Business Plus" width={40} height={40} /></span>
-        <span>World Business Plus<small>Administration</small></span>
+        <span className="m"><img src="/logos/wbp1.png" alt="World Business Plus" width={32} height={32} /></span>
+        <span>World Business Plus<small>Back-office</small></span>
       </div>
-      {GROUPS.map((g, gi) => (
-        <React.Fragment key={gi}>
-          {g.label && <div className="adm-navlabel">{g.label}</div>}
-          {g.items.map(([href, label, icon, key]) => {
-            const on = href === '/admin' ? pathname === '/admin' : pathname.startsWith(href);
-            const n = key ? counts[key] : 0;
-            return (
-              <Link key={href} href={href} className={`adm-navlink ${on ? 'on' : ''}`}>
-                <Icon name={icon} size={18} />{label}{n > 0 && <span className="badge-n">{n}</span>}
-              </Link>
-            );
-          })}
-        </React.Fragment>
-      ))}
+      <nav className="adm-side-nav" id="adm-side-nav">
+        {GROUPS.map((g, gi) => (
+          <React.Fragment key={gi}>
+            {g.label && <div className="adm-navlabel">{g.label}</div>}
+            {g.items.map(([href, label, icon, key]) => {
+              const on = href === '/admin' ? pathname === '/admin' : pathname.startsWith(href);
+              const n = key ? counts[key] : 0;
+              return (
+                <Link
+                  key={href}
+                  href={href}
+                  className={`adm-navlink ${on ? 'on' : ''}`}
+                  aria-current={on ? 'page' : undefined}
+                  title={mini ? `${label}${n ? ` (${n})` : ''}` : undefined}
+                  onClick={onNavigate}
+                >
+                  <Icon name={icon} size={17} />
+                  <span className="txt">{label}</span>
+                  {n > 0 && <span className="badge-n" aria-label={`${n} à traiter`}>{n > 99 ? '99+' : n}</span>}
+                </Link>
+              );
+            })}
+          </React.Fragment>
+        ))}
+      </nav>
       <div className="adm-side-foot">
-        <div className="who">{email}</div>
-        <div className="adm-actions">
-          <form action={signOutAction}><button className="adm-btn sm" type="submit">Déconnexion</button></form>
-          <Link href="/" className="adm-btn sm">Voir le site</Link>
-        </div>
+        <button type="button" className="adm-collapse" onClick={onToggleMini} aria-label={mini ? 'Déplier le menu' : 'Réduire le menu'} title={mini ? 'Déplier le menu' : 'Réduire le menu'}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <rect x="3" y="4" width="18" height="16" rx="3" /><path d="M9 4v16" /><path d="m15 10-2 2 2 2" />
+          </svg>
+          <span className="txt">Réduire le menu</span>
+        </button>
       </div>
     </aside>
   );

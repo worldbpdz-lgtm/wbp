@@ -268,7 +268,7 @@ function Rail({ children, label }) {
 
 function FicheModal({ product, brand, onClose }) {
   const { t, lang, wbp } = useApp();
-  const cat = wbp.categoryById(product.cat);
+  const cat = wbp.categoryById(product.cat) || { fr: '—', en: '—', ar: '—' };
   React.useEffect(() => {
     const onKey = (e) => { if (e.key === 'Escape') onClose(); };
     document.addEventListener('keydown', onKey); return () => document.removeEventListener('keydown', onKey);
@@ -469,10 +469,17 @@ function downloadUrl(doc) {
   }
 }
 
+// Produit sans marque (une trentaine dans le catalogue importé : alimentations,
+// câbles, accessoires…) ou catégorie inconnue : la fiche plantait sur
+// `brand.color` et le visiteur recevait une page d'erreur 500. On affiche
+// alors l'identité WBP.
+const NO_BRAND = { id: '', name: 'World Business Plus', short: 'WBP', color: '#FF5A1F' };
+const noCat = (id) => ({ id: id || '', icon: 'box', fr: 'Catalogue', en: 'Catalog', ar: 'الكتالوج' });
+
 export default function Product({ product, initialReviews }) {
   const { t, lang, nav, addToCart, wbp } = useApp();
-  const brand = wbp.brandById(product.brand);
-  const cat = wbp.categoryById(product.cat);
+  const brand = wbp.brandById(product.brand) || NO_BRAND;
+  const cat = wbp.categoryById(product.cat) || noCat(product.cat);
   const [qty, setQty] = React.useState(1);
   const [tab, setTab] = React.useState('overview');
   const [added, setAdded] = React.useState(false);

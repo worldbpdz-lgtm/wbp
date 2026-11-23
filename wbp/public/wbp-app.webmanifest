@@ -1,7 +1,7 @@
 {
   "name": "WBP — Espace équipe",
   "short_name": "WBP",
-  "description": "Statistiques du site World Business Plus, pour l'équipe.",
+  "description": "Commandes, devis, messages et statistiques du site World Business Plus, pour l'équipe — avec notifications.",
   "id": "/mobile",
   "start_url": "/mobile",
   "scope": "/mobile",
@@ -18,6 +18,8 @@
     { "src": "/app-icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ],
   "shortcuts": [
+    { "name": "À traiter", "short_name": "À traiter", "url": "/mobile/inbox?f=todo", "icons": [{ "src": "/app-icon-192.png", "sizes": "192x192" }] },
+    { "name": "Commandes", "url": "/mobile/inbox?f=order", "icons": [{ "src": "/app-icon-192.png", "sizes": "192x192" }] },
     { "name": "Statistiques", "url": "/mobile", "icons": [{ "src": "/app-icon-192.png", "sizes": "192x192" }] }
   ]
 }

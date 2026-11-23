@@ -1,13 +1,17 @@
 import { redirect } from 'next/navigation';
-import '../admin.css';
-// Chargée APRÈS admin.css : sélecteur d'images, cartes d'édition, vitrine, IA.
-import '../../../styles/admin-2026.css';
+// admin.css → admin-2026.css (éditeurs) → admin-crm.css (commandes, clients)
+// → admin-modern.css (système de design 2026), dans cet ordre garanti.
+import '../../../styles/admin-bundle.css';
+import { cookies } from 'next/headers';
 import { hasSupabase, createAdminClient } from '@/lib/supabase/server';
 import { getSessionUser } from '@/lib/auth';
 import { isAdminEmail } from '@/lib/admin';
-import AdminNav from '@/components/AdminNav';
+import AdminShell from '@/components/admin/AdminShell';
 import { signOutAction } from '@/app/admin/actions';
+import { displayName } from '@/lib/activity';
 import { SITE } from '@/lib/site';
+import { todoCounts, orLit } from '@/lib/crm-server';
+import AdminLive from '@/components/admin/crm/AdminLive';
 
 export const dynamic = 'force-dynamic';
 
@@ -32,16 +36,32 @@ export default async function PanelLayout({ children }) {
     );
   }
   const sb = createAdminClient();
-  const [q, m, r] = await Promise.all([
-    sb.from('quote_requests').select('id', { count: 'exact', head: true }).eq('site', SITE).eq('status', 'new'),
-    sb.from('contact_messages').select('id', { count: 'exact', head: true }).eq('site', SITE).eq('status', 'new'),
-    sb.from('reviews').select('id', { count: 'exact', head: true }).eq('site', SITE).eq('approved', false),
+  // Pastilles du menu : nouveaux devis, commandes à confirmer, messages, avis,
+  // et notifications non lues de CE compte.
+  const email = String(user.email).toLowerCase();
+  const [todo, read] = await Promise.all([
+    todoCounts(sb).catch(() => ({ quotes: 0, orders: 0, messages: 0, reviews: 0, total: 0 })),
+    sb.from('notification_reads').select('last_read_at').eq('site', SITE).eq('user_email', email).maybeSingle(),
   ]);
-  const counts = { quotes: q.count || 0, messages: m.count || 0, reviews: r.count || 0 };
+  let unread = 0;
+  {
+    const since = read.data?.last_read_at || '1970-01-01T00:00:00Z';
+    const { count, error } = await sb.from('notifications').select('id', { count: 'exact', head: true })
+      .eq('site', SITE).gt('created_at', since)
+      .or(`actor_email.is.null,actor_email.neq.${orLit(email)}`);
+    if (!error) unread = count || 0;
+  }
+  const counts = { ...todo, notifications: unread };
+  const mini = (await cookies()).get('wbp_adm_side')?.value === 'mini';
   return (
-    <div className="adm">
-      <AdminNav counts={counts} email={user.email} />
-      <main className="adm-main">{children}</main>
-    </div>
+    <AdminShell
+      counts={counts}
+      email={user.email}
+      name={displayName(user)}
+      mini={mini}
+      overlay={<AdminLive initialCounts={todo} />}
+    >
+      {children}
+    </AdminShell>
   );
 }

@@ -237,11 +237,13 @@ export function Confirm({ open, onClose, onConfirm, title, body, confirmLabel = 
 // sur une fiche par un lien direct (raccourci, notification), et « retour »
 // doit alors mener à la liste, pas hors de l'application.
 // ----------------------------------------------------------------------------
-export function SubTop({ title, subtitle, back = '/mobile', action }) {
+// `onBack` (facultatif) remplace la navigation : un écran avec des
+// modifications non enregistrées demande d'abord confirmation.
+export function SubTop({ title, subtitle, back = '/mobile', action, onBack }) {
   const router = useRouter();
   return (
     <header className="mb-sub-top">
-      <button type="button" className="back" onClick={() => router.push(back)} aria-label="Retour">
+      <button type="button" className="back" onClick={() => (onBack ? onBack() : router.push(back))} aria-label="Retour">
         <Icon name="chevleft" size={20} />
       </button>
       <div className="ttl">

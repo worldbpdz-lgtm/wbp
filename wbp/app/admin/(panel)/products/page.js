@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { Icon } from '@/components/primitives';
 import { createAdminClient, hasSupabase } from '@/lib/supabase/server';
 import { ToggleActive, ToggleFeatured, DeleteBtn } from '@/components/admin/controls';
 import { selectAll } from '@/lib/queries';
@@ -18,6 +19,8 @@ export default async function ProductsAdmin({ searchParams }) {
   const sp = await searchParams;
   const q = (sp?.q || '').trim();
   const filter = sp?.filter || 'all';
+  const cat = String(sp?.cat || '').slice(0, 60);
+  const brand = String(sp?.brand || '').slice(0, 60);
   const page = Math.max(1, parseInt(sp?.page, 10) || 1);
   const sb = createAdminClient();
 
@@ -34,19 +37,32 @@ export default async function ProductsAdmin({ searchParams }) {
   if (filter === 'hidden') query = query.eq('active', false);
   // Le filtre ★ passe par la liste d'identifiants du site (vide = aucun).
   if (filter === 'featured') query = query.in('id', picked.size ? [...picked] : ['']);
-  const { data: products, count, error } = await query
-    .order('active', { ascending: false }).order('sort').order('id')
-    .range((page - 1) * PER, page * PER - 1);
-  const { data: brands } = await sb.from('brands').select('id,name');
+  if (cat === '_none') query = query.is('cat', null);
+  else if (cat) query = query.eq('cat', cat);
+  if (brand === '_none') query = query.is('brand', null);
+  else if (brand) query = query.eq('brand', brand);
+  const [{ data: products, count, error }, { data: brands }, { data: cats }] = await Promise.all([
+    query.order('active', { ascending: false }).order('sort').order('id').range((page - 1) * PER, page * PER - 1),
+    sb.from('brands').select('id,name').order('name'),
+    sb.from('categories').select('id,name').order('sort'),
+  ]);
   const bmap = Object.fromEntries((brands || []).map((b) => [b.id, b.name]));
+  // Catégorie affichée par son nom (« Réseau & WiFi »), plus par son code interne.
+  const cmap = Object.fromEntries((cats || []).map((c) => [c.id, c.name?.fr || c.name || c.id]));
   const total = count || 0; const pages = Math.max(1, Math.ceil(total / PER));
-  const qs = (extra) => { const u = new URLSearchParams({ ...(q ? { q } : {}), ...(filter !== 'all' ? { filter } : {}), ...extra }); return u.toString() ? '?' + u : ''; };
+  const filtered = q || filter !== 'all' || cat || brand;
+  const qs = (extra) => {
+    const u = new URLSearchParams({
+      ...(q ? { q } : {}), ...(filter !== 'all' ? { filter } : {}), ...(cat ? { cat } : {}), ...(brand ? { brand } : {}), ...extra,
+    });
+    return u.toString() ? '?' + u : '';
+  };
 
   return (
     <>
       <div className="adm-head">
         <div><h1 className="adm-h1">Produits</h1><p className="adm-sub">{error ? 'Liste indisponible — voir le message ci-dessous.' : <>{total} produit(s){filter !== 'all' ? ` · ${{ active: 'visibles', hidden: 'masqués', featured: 'mis en avant' }[filter] || filter}` : ''}{q ? ` · recherche « ${q} »` : ''}. L’étoile ★ met un produit en avant : il apparaît en premier dans le catalogue.</>}</p></div>
-        <Link className="adm-btn primary" href="/admin/products/new">+ Nouveau produit</Link>
+        <Link className="adm-btn primary" href="/admin/products/new"><Icon name="plus" size={16} /> Nouveau produit</Link>
       </div>
 
       <form className="adm-actions" style={{ marginBottom: 16 }} method="get">
@@ -57,8 +73,18 @@ export default async function ProductsAdmin({ searchParams }) {
           <option value="hidden">Masqués</option>
           <option value="featured">Mis en avant ★</option>
         </select>
+        <select name="cat" defaultValue={cat} className="adm-btn" style={{ paddingInlineEnd: 30, maxWidth: 220 }} aria-label="Catégorie">
+          <option value="">Toutes catégories</option>
+          {(cats || []).map((c) => <option key={c.id} value={c.id}>{cmap[c.id]}</option>)}
+          <option value="_none">Sans catégorie</option>
+        </select>
+        <select name="brand" defaultValue={brand} className="adm-btn" style={{ paddingInlineEnd: 30, maxWidth: 200 }} aria-label="Marque">
+          <option value="">Toutes marques</option>
+          {(brands || []).map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+          <option value="_none">Sans marque</option>
+        </select>
         <button className="adm-btn primary" type="submit">Filtrer</button>
-        {(q || filter !== 'all') && <Link className="adm-btn" href="/admin/products">Réinitialiser</Link>}
+        {filtered && <Link className="adm-btn" href="/admin/products">Réinitialiser</Link>}
       </form>
 
       {error && (
@@ -72,12 +98,18 @@ export default async function ProductsAdmin({ searchParams }) {
         <table className="adm-table">
           <thead><tr><th>Référence</th><th>Nom</th><th>Catégorie</th><th>Marque</th><th>Prix</th><th>Statut</th><th></th></tr></thead>
           <tbody>
+            {!error && (products || []).length === 0 && (
+              <tr><td colSpan={7} className="adm-empty">
+                Aucun produit{filtered ? ' ne correspond à ces filtres' : ''}.{' '}
+                {filtered ? <Link href="/admin/products">Tout afficher</Link> : <Link href="/admin/products/new">Créer le premier produit</Link>}
+              </td></tr>
+            )}
             {(products || []).map((p) => (
               <tr key={p.id}>
                 <td className="adm-muted">{p.code}</td>
                 <td><b>{p.name}</b></td>
-                <td><span className="adm-muted">{p.cat}</span></td>
-                <td>{bmap[p.brand] || '—'}</td>
+                <td><span className="adm-muted">{p.cat ? (cmap[p.cat] || p.cat) : '—'}</span></td>
+                <td>{p.brand ? (bmap[p.brand] || p.brand) : <span className="adm-muted">—</span>}</td>
                 <td className="adm-muted">{dz(p.price)}</td>
                 <td>
                   <span className={`adm-tag ${p.active ? 'ok' : 'gray'}`}>{p.active ? 'Visible' : 'Masqué'}</span>

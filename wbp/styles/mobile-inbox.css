@@ -36,7 +36,7 @@
 
 .mbi-body {
   margin: 0; padding: 12px; border-radius: 13px; background: var(--bg);
-  font: 650 14px/1.6 inherit; color: var(--ink); white-space: pre-wrap;
+  font-weight: 650; font-size: 14px; line-height: 1.6; font-family: inherit; color: var(--ink); white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
 

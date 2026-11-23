@@ -62,7 +62,7 @@ function SearchBar({ variant = 'header' }) {
             <div className="search-res-img"><ProductImage product={p} /></div>
             <div className="search-res-txt">
               <span className="search-res-name">{p.name}</span>
-              <span className="search-res-meta">{wbp.brandById(p.brand)?.short} · {p.code}</span>
+              <span className="search-res-meta">{[wbp.brandById(p.brand)?.short, p.code].filter(Boolean).join(' · ')}</span>
             </div>
             <Icon name="chevright" size={15} style={{ opacity: 0.4 }} />
           </button>

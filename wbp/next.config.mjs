@@ -19,6 +19,12 @@
 //    et 'unsafe-eval' restent nécessaires au moteur de rendu de Next.js ; la
 //    politique bloque néanmoins tout script chargé depuis un domaine tiers.
 // ============================================================================
+// Origine exacte du projet Supabase (domaine personnalisé compris) : sans elle,
+// un projet servi ailleurs que sur *.supabase.co serait bloqué par la CSP.
+const supabaseOrigin = (() => {
+  try { return new URL(process.env.NEXT_PUBLIC_SUPABASE_URL || '').origin; } catch { return ''; }
+})();
+
 const csp = [
   "default-src 'self'",
   "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
@@ -29,7 +35,9 @@ const csp = [
   "img-src 'self' data: blob: https:",
   "media-src 'self'",
   // Requêtes sortantes du navigateur : Supabase (auth, catalogue) et le site.
-  "connect-src 'self' https://*.supabase.co wss://*.supabase.co",
+  `connect-src 'self' https://*.supabase.co wss://*.supabase.co${supabaseOrigin && !supabaseOrigin.endsWith('.supabase.co') ? ` ${supabaseOrigin}` : ''}`,
+  // Service workers de l'app mobile et des notifications du back-office.
+  "worker-src 'self'",
   "frame-ancestors 'none'",
   "base-uri 'self'",
   "form-action 'self'",
@@ -76,6 +84,10 @@ const nextConfig = {
       // pendant 24 h et les téléphones resteraient sur une version périmée.
       {
         source: '/sw.js',
+        headers: [{ key: 'Cache-Control', value: 'no-cache, max-age=0, must-revalidate' }],
+      },
+      {
+        source: '/admin-sw.js',
         headers: [{ key: 'Cache-Control', value: 'no-cache, max-age=0, must-revalidate' }],
       },
     ];

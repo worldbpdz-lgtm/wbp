@@ -58,6 +58,15 @@ export default function SettingsManager({ settings, clients }) {
     setPop((s) => ({ ...s, [k]: v }));
   };
 
+  // Mentions des documents imprimés (bon de commande, proforma, devis).
+  const DOC = settings.documents || {};
+  const [docs, setDocs] = useState({
+    company: DOC.company || '', activity: DOC.activity || '', legal: DOC.legal || '',
+    terms_order: DOC.terms_order || '', terms_quote: DOC.terms_quote || '',
+    validity_days: Number(DOC.validity_days ?? 15),
+  });
+  const setD = (k) => (e) => setDocs((s) => ({ ...s, [k]: e.target.value }));
+
   const [newClient, setNewClient] = useState('');
   const [clientErr, setClientErr] = useState('');
   const [clientBusy, setClientBusy] = useState(false);
@@ -66,7 +75,7 @@ export default function SettingsManager({ settings, clients }) {
   return (
     <>
       <div className="adm-card-form" style={{ marginBottom: 18 }}>
-        <h2 style={{ marginTop: 0, fontSize: 16 }}>WhatsApp & contact</h2>
+        <h2 className="adm-sec-t">WhatsApp & contact</h2>
         <div className="adm-form">
           <div className="adm-grid2">
             <label>Numéro WhatsApp (format international, sans +)<input value={wa} onChange={(e) => setWa(e.target.value)} placeholder="213560018206" /></label>
@@ -94,7 +103,7 @@ export default function SettingsManager({ settings, clients }) {
       </div>
 
       <div className="adm-card-form" style={{ marginBottom: 18 }}>
-        <h2 style={{ marginTop: 0, fontSize: 16 }}>Bandeau d’accueil (laisser vide = texte par défaut)</h2>
+        <h2 className="adm-sec-t">Bandeau d’accueil (laisser vide = texte par défaut)</h2>
         <div className="adm-form">
           {[['fr', 'Français'], ['en', 'English'], ['ar', 'العربية']].map(([l, lbl]) => (
             <div className="adm-grid2" key={l}>
@@ -111,7 +120,7 @@ export default function SettingsManager({ settings, clients }) {
 
       {/* ---------------- Pop-up newsletter ---------------- */}
       <div className="adm-card-form" style={{ marginBottom: 18 }}>
-        <h2 style={{ marginTop: 0, fontSize: 16 }}>Pop-up newsletter (à l’ouverture du site)</h2>
+        <h2 className="adm-sec-t">Pop-up newsletter (à l’ouverture du site)</h2>
         <p className="adm-sub" style={{ marginBottom: 14 }}>
           La carte s’affiche une seule fois par visiteur, puis se tait pendant le nombre de jours
           indiqué. Elle ne réapparaît jamais pour quelqu’un qui s’est inscrit.
@@ -183,13 +192,45 @@ export default function SettingsManager({ settings, clients }) {
         }} />
       </div>
 
+      {/* ---------------- Documents imprimés ---------------- */}
+      <div className="adm-card-form" style={{ marginBottom: 18 }}>
+        <h2 className="adm-sec-t">Documents imprimés (bon de commande, facture proforma, devis)</h2>
+        <p className="adm-sub" style={{ marginBottom: 14 }}>
+          En-tête et pied de page des documents imprimés depuis une commande ou un devis. L’adresse, les téléphones
+          et l’e-mail viennent du bloc « WhatsApp & contact » ci-dessus.
+        </p>
+        <div className="adm-form">
+          <div className="adm-grid2">
+            <label>Raison sociale<input value={docs.company} onChange={setD('company')} placeholder="SARL World Business Plus" /></label>
+            <label>Validité des devis (jours)<input type="number" min="1" max="365" value={docs.validity_days} onChange={setD('validity_days')} /></label>
+          </div>
+          <label>Activité (sous la raison sociale)<input value={docs.activity} onChange={setD('activity')} /></label>
+          <label>Mentions légales — une par ligne (RC, NIF, NIS, AI, RIB…)
+            <textarea rows={4} value={docs.legal} onChange={setD('legal')} placeholder={'RC : 16/00-0000000B00\nNIF : 000000000000000\nNIS : 000000000000000\nRIB : 000 00000 0000000000 00'} />
+          </label>
+          <div className="adm-grid2">
+            <label>Conditions — bon de commande<textarea rows={3} value={docs.terms_order} onChange={setD('terms_order')} /></label>
+            <label>Conditions — devis et proforma<textarea rows={3} value={docs.terms_quote} onChange={setD('terms_quote')} /></label>
+          </div>
+        </div>
+        <Saver onSave={async () => {
+          const r = await saveSetting('documents', {
+            company: docs.company.trim(), activity: docs.activity.trim(), legal: docs.legal.trim(),
+            terms_order: docs.terms_order.trim(), terms_quote: docs.terms_quote.trim(),
+            validity_days: Math.min(365, Math.max(1, parseInt(docs.validity_days, 10) || 15)),
+          });
+          refresh(); return r;
+        }} />
+      </div>
+
       <div className="adm-card-form">
-        <h2 style={{ marginTop: 0, fontSize: 16 }}>Clients / références ({clients.length})</h2>
+        <h2 className="adm-sec-t">Logos « Ils nous font confiance » ({clients.length})</h2>
+        <p className="adm-sub" style={{ marginBottom: 12 }}>Les noms affichés dans la bande de références du site public. Les fiches de vos clients (coordonnées, commandes) sont dans le menu « Clients ».</p>
         {/* Le résultat de addClient / deleteClient était ignoré : un échec
             vidait quand même le champ et semblait avoir fonctionné. */}
         {clientErr && <div className="adm-err" style={{ marginBottom: 10 }}>{clientErr}</div>}
         <div className="adm-actions" style={{ marginBottom: 12 }}>
-          <input className="adm-form" style={{ padding: '9px 12px', border: '1px solid var(--line)', borderRadius: 11, minWidth: 240 }} value={newClient} onChange={(e) => setNewClient(e.target.value)} placeholder="Nom du client" />
+          <input style={{ minWidth: 240, width: 'auto', flex: '1 1 240px' }} value={newClient} onChange={(e) => setNewClient(e.target.value)} placeholder="Nom du client" />
           <button className="adm-btn primary" disabled={clientBusy} onClick={async () => {
             if (!newClient.trim()) return;
             setClientErr(''); setClientBusy(true);

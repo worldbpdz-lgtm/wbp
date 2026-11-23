@@ -52,13 +52,13 @@
 .mbv-ctrl button {
   min-height: 46px; padding: 0; border: 1px solid var(--line); border-radius: 12px;
   background: var(--card); color: var(--ink-2);
-  font: 800 17px/1 inherit; font-family: inherit;
+  font-weight: 800; font-size: 17px; line-height: 1; font-family: inherit;
   display: grid; place-items: center;
 }
 .mbv-ctrl button:active { transform: scale(.96); }
 .mbv-ctrl button:disabled { opacity: .32; }
 .mbv-ctrl .rm {
-  grid-column: 1 / -1; font: 700 13px/1 inherit; font-family: inherit;
+  grid-column: 1 / -1; font-weight: 700; font-size: 13px; line-height: 1; font-family: inherit;
   color: #DC2626; border-color: #FBD5D5;
 }
 
@@ -86,4 +86,4 @@
 }
 .mbv-pick:active { transform: scale(.99); }
 .mbv-pick .mbv-bd { flex: 1; }
-.mbv-plus { flex-shrink: 0; color: var(--o); font: 800 19px/1 inherit; width: 24px; text-align: center; }
+.mbv-plus { flex-shrink: 0; color: var(--o); font-weight: 800; font-size: 19px; line-height: 1; font-family: inherit; width: 24px; text-align: center; }

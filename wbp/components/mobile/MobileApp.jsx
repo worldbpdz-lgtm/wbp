@@ -1,14 +1,16 @@
 'use client';
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { logSignOutAction } from '@/app/admin/actions';
 import Splash, { SPLASH_MS } from '@/components/mobile/Splash';
 import Login from '@/components/mobile/Login';
 import { Icon } from '@/components/mobile/ui';
-import { ToastHost } from '@/components/mobile/form';
+import { ToastHost, Confirm } from '@/components/mobile/form';
 import { clearCache, readCache, writeCache } from '@/components/mobile/store';
+import { useNotificationFeed, setAppBadge, forgetThisDevice } from '@/components/push-client';
+import '@/styles/mobile-orders.css';
 
 // ============================================================================
 // Coquille de l'application mobile : elle vit dans la mise en page de /mobile,
@@ -38,19 +40,23 @@ import { clearCache, readCache, writeCache } from '@/components/mobile/store';
 // Les garder séparés n'est pas de la gymnastique : donner en plus l'édition au
 // propriétaire (ou retirer le journal) se fait alors dans `lib/admin.js` seul,
 // sans toucher cette coquille.
-const Ctx = createContext({ me: null, owner: false, editor: false, ready: false, signOut: () => {} });
+const Ctx = createContext({ me: null, owner: false, editor: false, ready: false, signOut: () => {}, counts: null, unread: 0, reloadFeed: () => {} });
 export const useMobile = () => useContext(Ctx);
 
 // ----------------------------------------------------------------------------
 // Deux applications, une seule adresse.
 //
-//   PROPRIÉTAIRE  Stats · Activité
-//                 Il supervise : les chiffres, et qui a fait quoi. Il modifie
-//                 le site depuis /admin, sur ordinateur.
+//   PROPRIÉTAIRE  Stats · Demandes · Activité
+//                 Il supervise : les chiffres, les commandes et demandes qui
+//                 arrivent (en lecture seule — il peut appeler le client), et
+//                 qui a fait quoi. Il modifie depuis /admin, sur ordinateur.
 //
 //   ÉQUIPE        Stats · Produits · Demandes · Plus
-//                 Elle travaille : fiches et photos, devis et messages, avis,
-//                 vitrine, marques, catégories, réglages.
+//                 Elle travaille : commandes, devis et messages, fiches et
+//                 photos, avis, vitrine, marques, catégories, réglages.
+//
+// La cloche de l'en-tête (tous les comptes) mène aux notifications et à leurs
+// réglages pour ce téléphone.
 //
 // Quatre onglets est la limite : au-delà, les libellés se tronquent sur un
 // iPhone SE. Le reste vit derrière « Plus », qui est un écran, pas un menu
@@ -66,9 +72,12 @@ const TAB_PRODUCTS = ['/mobile/products', 'Produits', 'box'];
 const TAB_INBOX = ['/mobile/inbox', 'Demandes', 'inbox'];
 const TAB_MORE = ['/mobile/plus', 'Plus', 'dots'];
 
+// Le propriétaire voit aussi les demandes et les commandes — en lecture seule
+// (appeler, écrire sur WhatsApp) : c'est là que mènent ses notifications.
 function tabsFor({ owner, editor }) {
   const tabs = [TAB_STATS];
-  if (editor) tabs.push(TAB_PRODUCTS, TAB_INBOX);
+  if (editor) tabs.push(TAB_PRODUCTS);
+  if (editor || owner) tabs.push(TAB_INBOX);
   if (owner) tabs.push(TAB_ACTIVITY);
   if (editor) tabs.push(TAB_MORE);
   return tabs;
@@ -76,6 +85,7 @@ function tabsFor({ owner, editor }) {
 
 export default function MobileApp({ children }) {
   const pathname = usePathname();
+  const router = useRouter();
   const [splash, setSplash] = useState(true);
   const [session, setSession] = useState(undefined); // undefined = vérification en cours
   const [profile, setProfile] = useState(null);      // { email, name, owner }
@@ -137,6 +147,9 @@ export default function MobileApp({ children }) {
   }, [session]);
 
   const signOut = useCallback(async () => {
+    // Cet appareil cesse d'abord de recevoir les notifications du compte.
+    await forgetThisDevice('/mobile');
+    setAppBadge(0);
     clearCache();
     setProfile(null);
     // Journalise « Déconnexion » puis ferme la session côté serveur. Variante
@@ -169,14 +182,40 @@ export default function MobileApp({ children }) {
   const tabs = tabsFor({ owner, editor });
   const solo = tabs.length < 2;
 
+  // Fil des notifications et compteurs « à traiter » : pastille de l'onglet
+  // Demandes, point rouge de la cloche, badge de l'icône de l'app.
+  const { data: feed, reload: reloadFeed } = useNotificationFeed({ every: 60000, enabled: !!session && ready });
+  const counts = feed?.counts || null;
+  const unread = feed?.unread || 0;
+  useEffect(() => { if (counts) setAppBadge(counts.total || 0); }, [counts]);
+
+  // Toucher une notification alors que l'app est déjà ouverte : le service
+  // worker demande d'ouvrir l'écran concerné.
+  useEffect(() => {
+    if (!('serviceWorker' in navigator)) return undefined;
+    const onMsg = (e) => {
+      if (e?.data?.type !== 'wbp-open' || !e.data.url) return;
+      try {
+        const u = new URL(e.data.url, window.location.origin);
+        if (u.origin === window.location.origin) router.push(u.pathname + u.search);
+      } catch { /* adresse illisible */ }
+    };
+    navigator.serviceWorker.addEventListener('message', onMsg);
+    return () => navigator.serviceWorker.removeEventListener('message', onMsg);
+  }, [router]);
+
   // Un onglet actif inclut ses sous-pages : /mobile/products/xyz doit garder
   // « Produits » allumé, sinon la barre paraît éteinte dès qu'on ouvre une fiche.
   const isOn = (href) => (href === '/mobile'
     ? pathname === '/mobile'
     : pathname === href || pathname.startsWith(`${href}/`));
 
+  // Documents imprimables (/mobile/print/…) : pleine page, sans onglets ni
+  // écran d'ouverture — la page serveur contrôle elle-même la session.
+  if (pathname?.startsWith('/mobile/print/')) return children;
+
   return (
-    <Ctx.Provider value={{ me, owner, editor, ready, signOut }}>
+    <Ctx.Provider value={{ me, owner, editor, ready, signOut, counts, unread, reloadFeed }}>
       {splash && <Splash />}
       {session === undefined ? (
         <div className="mb-login"><div className="brand">
@@ -191,12 +230,18 @@ export default function MobileApp({ children }) {
           <div className={`mb${solo ? ' solo' : ''}`}>{children}</div>
           {!solo && (
             <nav className="mb-tabs" aria-label="Navigation principale">
-              {tabs.map(([href, label, icon]) => (
-                <Link key={href} href={href} className={`mb-tab ${isOn(href) ? 'on' : ''}`}>
-                  <Icon name={icon} size={21} />
-                  {label}
-                </Link>
-              ))}
+              {tabs.map(([href, label, icon]) => {
+                const badge = href === '/mobile/inbox' ? (counts?.total || 0) : 0;
+                return (
+                  <Link key={href} href={href} className={`mb-tab ${isOn(href) ? 'on' : ''}`}>
+                    <span className="mb-tab-ic">
+                      <Icon name={icon} size={21} />
+                      {badge > 0 && <i className="mb-tab-badge" aria-label={`${badge} à traiter`}>{badge > 99 ? '99+' : badge}</i>}
+                    </span>
+                    {label}
+                  </Link>
+                );
+              })}
             </nav>
           )}
         </ToastHost>
@@ -211,8 +256,13 @@ export default function MobileApp({ children }) {
 // chaque page lui passe.
 // ----------------------------------------------------------------------------
 export function TopBar({ title, subtitle, onRefresh, busy }) {
-  const { signOut } = useMobile();
+  const { signOut, unread } = useMobile();
+  // Une déconnexion par erreur (le bouton est à côté de « rafraîchir ») coupe
+  // aussi les notifications de l'appareil : on demande confirmation.
+  const [askOut, setAskOut] = useState(false);
+  const [leaving, setLeaving] = useState(false);
   return (
+    <>
     <header className="mb-top">
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src="/app-icon-192.png" alt="" width={34} height={34} />
@@ -225,9 +275,24 @@ export function TopBar({ title, subtitle, onRefresh, busy }) {
           <Icon name="refresh" size={18} />
         </button>
       )}
-      <button className="mb-icbtn" onClick={signOut} aria-label="Se déconnecter">
+      <Link href="/mobile/notifications" className="mb-icbtn mb-bell" aria-label={unread ? `Notifications (${unread} non lues)` : 'Notifications'}>
+        <Icon name="bell" size={18} />
+        {unread > 0 && <i>{unread > 9 ? '9+' : unread}</i>}
+      </Link>
+      <button className="mb-icbtn" onClick={() => setAskOut(true)} aria-label="Se déconnecter">
         <Icon name="logout" size={18} />
       </button>
     </header>
+    <Confirm
+      open={askOut}
+      onClose={() => setAskOut(false)}
+      busy={leaving}
+      title="Se déconnecter ?"
+      body="Ce téléphone ne recevra plus les notifications de votre compte jusqu’à votre prochaine connexion."
+      confirmLabel="Se déconnecter"
+      danger
+      onConfirm={async () => { setLeaving(true); try { await signOut(); } finally { setLeaving(false); setAskOut(false); } }}
+    />
+    </>
   );
 }

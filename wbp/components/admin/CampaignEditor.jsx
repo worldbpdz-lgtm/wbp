@@ -3,9 +3,10 @@ import React, { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { updateCampaign, sendTestCampaign, sendCampaign, deleteCampaign } from '@/app/admin/actions';
 
-const box = { border: '1px solid rgba(22,18,14,.14)', borderRadius: 12, background: '#fff', padding: 16 };
-const field = { width: '100%', padding: '10px 12px', borderRadius: 10, border: '1px solid rgba(22,18,14,.16)', fontSize: 14, outline: 'none', background: '#fff', fontFamily: 'inherit' };
-const lbl = { display: 'block', fontSize: 12, fontWeight: 700, letterSpacing: '.03em', textTransform: 'uppercase', color: '#6E655C', margin: '0 0 6px' };
+// Styles alignés sur le système de design du back-office (admin-modern.css).
+const box = { border: '1px solid var(--line)', borderRadius: 12, background: '#fff', padding: 16, boxShadow: 'var(--shadow)' };
+const field = { width: '100%', padding: '9px 12px', borderRadius: 8, border: '1px solid var(--line)', fontSize: 14, outline: 'none', background: '#fff', fontFamily: 'inherit', color: 'var(--ink)' };
+const lbl = { display: 'block', fontSize: 12.5, fontWeight: 550, color: 'var(--ink-2)', margin: '0 0 6px' };
 
 // Client-side approximation of the server email template (for live preview only).
 function previewHtml({ subject, preheader, body }) {
@@ -30,9 +31,9 @@ function escapeHtml(s) { return String(s || '').replace(/[&<>"]/g, (c) => ({ '&'
 
 export default function CampaignEditor({ campaign, stats, emailLive }) {
   const router = useRouter();
-  const [subject, setSubject] = useState(campaign.subject);
-  const [preheader, setPreheader] = useState(campaign.preheader);
-  const [body, setBody] = useState(campaign.body_html);
+  const [subject, setSubject] = useState(campaign.subject || '');
+  const [preheader, setPreheader] = useState(campaign.preheader || '');
+  const [body, setBody] = useState(campaign.body_html || '');
   const [testEmail, setTestEmail] = useState('');
   const [msg, setMsg] = useState(null);
   const [busy, setBusy] = useState('');
@@ -41,33 +42,57 @@ export default function CampaignEditor({ campaign, stats, emailLive }) {
   const preview = useMemo(() => previewHtml({ subject, preheader, body }), [subject, preheader, body]);
   const flash = (text, tone = 'ok') => { setMsg({ text, tone }); setTimeout(() => setMsg(null), 6000); };
 
-  const save = async () => {
-    setBusy('save');
+  // Chaque action : bouton occupé le temps de l'appel, et toujours libéré —
+  // même si le réseau coupe (sans le `finally`, le bouton restait grisé).
+  const FAIL = 'Pas de réseau ou serveur indisponible — réessayez.';
+  const dirty = subject !== (campaign.subject || '') || preheader !== (campaign.preheader || '') || body !== (campaign.body_html || '');
+  const persist = async () => {
     const r = await updateCampaign(campaign.id, { subject, preheader, body_html: body });
-    setBusy('');
-    if (r?.ok) flash('Enregistré ✓'); else flash(r?.error || 'Erreur', 'err');
-    return r?.ok;
+    if (!r?.ok) throw new Error(r?.error || 'Enregistrement impossible.');
+    return r;
   };
-  const test = async () => {
-    if (!testEmail.includes('@')) return flash('Adresse de test invalide', 'err');
-    setBusy('test'); await updateCampaign(campaign.id, { subject, preheader, body_html: body });
-    const r = await sendTestCampaign(campaign.id, testEmail);
-    setBusy('');
-    if (r?.ok) flash(r.dev ? 'Test « envoyé » (mode dev : voir .email-outbox / logs)' : 'E-mail de test envoyé ✓');
-    else flash(r?.error || 'Échec de l’envoi', 'err');
+  const guarded = async (name, fn) => {
+    if (busy) return;
+    setBusy(name);
+    try { await fn(); } catch (e) { flash(e?.message && e.message !== 'Failed to fetch' ? e.message : FAIL, 'err'); } finally { setBusy(''); }
   };
-  const sendAll = async () => {
-    if (!confirm(`Envoyer cette campagne à tous les abonnés confirmés (${stats.audience}) ?`)) return;
-    setBusy('send'); await updateCampaign(campaign.id, { subject, preheader, body_html: body });
-    const r = await sendCampaign(campaign.id);
-    setBusy('');
-    if (r?.ok) { flash(`Envoyée : ${r.sent} ok${r.failed ? `, ${r.failed} échec(s)` : ''}.`); router.refresh(); }
-    else flash(r?.error || 'Échec', 'err');
+
+  const save = () => guarded('save', async () => { await persist(); flash('Enregistré ✓'); router.refresh(); });
+  const test = () => {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(testEmail.trim())) return flash('Adresse de test invalide', 'err');
+    return guarded('test', async () => {
+      if (!sent) await persist();
+      const r = await sendTestCampaign(campaign.id, testEmail.trim());
+      if (r?.ok) flash(r.dev ? 'Test « envoyé » (mode dev : voir .email-outbox / logs)' : 'E-mail de test envoyé ✓');
+      else flash(r?.error || 'Échec de l’envoi', 'err');
+    });
   };
-  const remove = async () => {
-    if (!confirm('Supprimer cette campagne ?')) return;
-    await deleteCampaign(campaign.id); router.push('/admin/campaigns');
+  const sendAll = () => {
+    if (!subject.trim() || !body.trim()) return flash('Renseignez l’objet et le corps avant d’envoyer.', 'err');
+    if (!confirm(`Envoyer cette campagne à tous les abonnés confirmés (${stats.audience}) ? Cette action est définitive.`)) return undefined;
+    return guarded('send', async () => {
+      await persist();
+      const r = await sendCampaign(campaign.id);
+      if (r?.ok) { flash(`Envoyée : ${r.sent} ok${r.failed ? `, ${r.failed} échec(s)` : ''}.`); router.refresh(); }
+      else flash(r?.error || 'Échec', 'err');
+    });
   };
+  const remove = () => {
+    if (!confirm('Supprimer cette campagne ? Ses statistiques seront perdues.')) return undefined;
+    return guarded('remove', async () => {
+      const r = await deleteCampaign(campaign.id);
+      if (r && r.ok === false) throw new Error(r.error || 'Suppression impossible.');
+      router.push('/admin/campaigns');
+    });
+  };
+
+  // Prévenir avant de quitter la page avec un brouillon non enregistré.
+  React.useEffect(() => {
+    if (!dirty || sent) return undefined;
+    const h = (e) => { e.preventDefault(); e.returnValue = ''; };
+    window.addEventListener('beforeunload', h);
+    return () => window.removeEventListener('beforeunload', h);
+  }, [dirty, sent]);
 
   const openRate = stats.sent ? Math.round((stats.opened / stats.sent) * 100) : 0;
   const clickRate = stats.sent ? Math.round((stats.clicked / stats.sent) * 100) : 0;
@@ -80,8 +105,8 @@ export default function CampaignEditor({ campaign, stats, emailLive }) {
           <p className="adm-sub">{sent ? `Envoyée le ${(campaign.sent_at || '').slice(0, 10)}` : 'Brouillon'} · audience {stats.audience} abonné(s)</p>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button className="adm-btn" onClick={save} disabled={busy === 'save'}>{busy === 'save' ? '…' : 'Enregistrer'}</button>
-          <button className="adm-btn danger" onClick={remove}>Supprimer</button>
+          {!sent && <button className="adm-btn" onClick={save} disabled={!!busy}>{busy === 'save' ? '…' : dirty ? 'Enregistrer •' : 'Enregistrer'}</button>}
+          <button className="adm-btn danger" onClick={remove} disabled={!!busy}>{busy === 'remove' ? '…' : 'Supprimer'}</button>
         </div>
       </div>
 
@@ -118,11 +143,11 @@ export default function CampaignEditor({ campaign, stats, emailLive }) {
             <label style={lbl}>Envoi de test</label>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               <input style={{ ...field, flex: '1 1 200px' }} value={testEmail} onChange={(e) => setTestEmail(e.target.value)} placeholder="vous@exemple.dz" type="email" />
-              <button className="adm-btn" onClick={test} disabled={busy === 'test'}>{busy === 'test' ? '…' : 'Envoyer un test'}</button>
+              <button className="adm-btn" onClick={test} disabled={!!busy}>{busy === 'test' ? '…' : 'Envoyer un test'}</button>
             </div>
           </div>
           {!sent && (
-            <button className="adm-btn primary" style={{ height: 48, fontSize: 15 }} onClick={sendAll} disabled={busy === 'send'}>
+            <button className="adm-btn primary" style={{ height: 48, fontSize: 15 }} onClick={sendAll} disabled={!!busy || !stats.audience}>
               {busy === 'send' ? 'Envoi en cours…' : `Envoyer à tous les abonnés (${stats.audience})`}
             </button>
           )}
@@ -130,7 +155,7 @@ export default function CampaignEditor({ campaign, stats, emailLive }) {
 
         <div>
           <label style={lbl}>Aperçu</label>
-          <iframe title="preview" srcDoc={preview} style={{ width: '100%', height: 560, border: '1px solid rgba(22,18,14,.14)', borderRadius: 12, background: '#f4f1ec' }} />
+          <iframe title="preview" srcDoc={preview} sandbox="allow-popups allow-popups-to-escape-sandbox" style={{ width: '100%', height: 560, border: '1px solid var(--line)', borderRadius: 12, background: 'var(--panel-2)' }} />
         </div>
       </div>
 

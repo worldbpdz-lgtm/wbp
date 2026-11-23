@@ -2,7 +2,7 @@
    World Business Plus — Admin (WBP brand theme: warm cream + orange)
    ============================================================================ */
 .adm, .adm-login{
-  --bg:#f6f3ec; --panel:#ffffff; --ink:#1b1410; --ink-2:#6f6359; --ink-3:#a89c8d;
+  --bg:#f6f3ec; --panel:#ffffff; --ink:#1b1410; --ink-2:var(--ink-2); --ink-3:#a89c8d;
   --line:#ece5d9; --line-2:#f4efe6;
   --accent:#FF5A1F; --accent-d:#e8480f; --accent-soft:#fff1e9; --accent-glow:rgba(255,90,31,.30);
   --orange:#FF5A1F; --amber:#F59E0B; --gold:#C98A14; --teal:#0E9488;
@@ -16,7 +16,7 @@
 }
 
 /* layout */
-.adm{min-height:100vh;display:grid;grid-template-columns:262px 1fr;background:
+.adm{min-height:100vh;display:grid;grid-template-columns:262px minmax(0,1fr);background:
   radial-gradient(900px 420px at 100% -8%, #ffe9dd66, transparent), var(--bg)}
 .adm-side{position:sticky;top:0;height:100vh;background:linear-gradient(180deg,var(--side-1),var(--side-2));
   color:#f3ece2;padding:22px 16px;display:flex;flex-direction:column;gap:3px;overflow:auto}
@@ -37,11 +37,14 @@
 .adm-navlink .badge-n{margin-inline-start:auto;background:var(--accent);color:#fff;border-radius:999px;font-size:11px;font-weight:800;padding:1px 8px;line-height:1.7}
 .adm-navlink.on .badge-n{background:rgba(255,255,255,.25)}
 .adm-side-foot{margin-top:auto;padding-top:16px;border-top:1px solid rgba(255,255,255,.12);font-size:12px}
+/* Grand écran : le conteneur du menu s'efface, les liens restent dans la colonne. */
+.adm-side-nav{display:contents}
+.adm-menu-btn{display:none}
 .adm-side-foot .who{opacity:.62;margin-bottom:10px;word-break:break-all}
 .adm-side-foot .adm-btn{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.16);color:#f3ece2}
 .adm-side-foot .adm-btn:hover{background:rgba(255,255,255,.16)}
 
-.adm-main{padding:32px 36px;max-width:1300px}
+.adm-main{padding:32px 36px;max-width:1300px;min-width:0}
 .adm-head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:26px}
 .adm-h1{font-family:var(--font-display);font-size:27px;font-weight:700;margin:0 0 4px;letter-spacing:-.025em}
 .adm-sub{color:var(--ink-2);margin:0;font-size:14px}
@@ -68,6 +71,10 @@
 .adm-row{display:grid;gap:16px;margin-bottom:16px}
 .adm-row.c2{grid-template-columns:1.35fr 1fr}
 .adm-panel{background:var(--panel);border-radius:18px;box-shadow:var(--shadow);border:1px solid var(--line-2);overflow:hidden;margin-bottom:16px}
+/* Tableau plus large que l'écran (portable, tablette) : il défile dans son
+   cadre au lieu d'élargir toute la page et de pousser les boutons hors champ. */
+.adm-panel:has(> .adm-table){overflow-x:auto;-webkit-overflow-scrolling:touch}
+.adm-panel > .adm-table{min-width:720px}
 .adm-panel-hd{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:16px 20px;border-bottom:1px solid var(--line)}
 .adm-panel-hd h2{font-size:15px;margin:0;font-family:var(--font-display);font-weight:700;letter-spacing:-.01em}
 .adm-panel-hd h2::before{content:"";display:inline-block;width:8px;height:8px;border-radius:3px;background:var(--accent);margin-inline-end:9px;vertical-align:middle}
@@ -88,11 +95,11 @@
 /* tables */
 .adm-table{width:100%;border-collapse:collapse;font-size:13.5px}
 .adm-table th{text-align:start;font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-3);
-  padding:12px 18px;border-bottom:1px solid var(--line);background:#fbf8f2;font-weight:800}
+  padding:12px 18px;border-bottom:1px solid var(--line);background:var(--panel-2);font-weight:800}
 .adm-table td{padding:13px 18px;border-bottom:1px solid var(--line-2);vertical-align:top}
 .adm-table tr:last-child td{border-bottom:none}
 .adm-table tbody tr{transition:background .12s}
-.adm-table tbody tr:hover{background:#fdfbf6}
+.adm-table tbody tr:hover{background:var(--panel-2)}
 
 /* pills */
 .adm-tag{display:inline-block;font-size:11px;font-weight:800;padding:3px 11px;border-radius:999px;background:var(--line);color:var(--ink-2)}
@@ -107,7 +114,7 @@ select.adm-tag{border:none;cursor:pointer;-webkit-appearance:none;appearance:non
 /* buttons */
 .adm-btn{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);background:#fff;color:var(--ink);
   border-radius:11px;padding:9px 15px;font-weight:700;font-size:13px;cursor:pointer;text-decoration:none;transition:.15s}
-.adm-btn:hover{border-color:#e0d8c9;background:#fbf8f2}
+.adm-btn:hover{border-color:var(--line-strong);background:var(--panel-2)}
 .adm-btn.primary{background:linear-gradient(135deg,#FF7A45,var(--accent));border-color:transparent;color:#fff;box-shadow:0 12px 24px -12px var(--accent-glow)}
 .adm-btn.primary:hover{filter:brightness(1.04)}
 .adm-btn.danger{color:#c0392b;border-color:#f1c9c0}
@@ -140,17 +147,17 @@ select.adm-tag{border:none;cursor:pointer;-webkit-appearance:none;appearance:non
 .adm-panel textarea{
   font:inherit;font-size:14px;font-weight:500;text-transform:none;letter-spacing:normal;
   width:100%;box-sizing:border-box;height:42px;padding:0 13px;
-  border:1px solid var(--line);border-radius:10px;background:#fdfbf7;color:var(--ink);
+  border:1px solid var(--line);border-radius:10px;background:var(--field);color:var(--ink);
   transition:border-color .15s,box-shadow .15s,background .15s}
 .adm-panel textarea{height:auto;min-height:92px;padding:11px 13px;line-height:1.5;resize:vertical}
 .adm-panel input:not([type=color]):hover,
-.adm-panel select:not(.adm-tag):hover{border-color:#e0d8c9}
+.adm-panel select:not(.adm-tag):hover{border-color:var(--line-strong)}
 .adm-panel input:not([type=color]):focus,
 .adm-panel select:not(.adm-tag):focus,
 .adm-panel textarea:focus{outline:none;border-color:var(--accent);background:#fff;box-shadow:0 0 0 3px var(--accent-soft)}
 .adm-panel input:disabled,.adm-panel select:disabled{background:var(--line-2);color:var(--ink-3);cursor:not-allowed}
 .adm-panel select:not(.adm-tag){appearance:none;-webkit-appearance:none;padding-inline-end:34px;
-  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23a89c8d' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%238a90a0' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
   background-repeat:no-repeat;background-position:right 12px center}
 [dir=rtl] .adm-panel select:not(.adm-tag){background-position:left 12px center}
 .adm-panel input[type=color]{width:58px;height:40px;padding:3px;border:1px solid var(--line);border-radius:10px;cursor:pointer;background:#fff}
@@ -388,8 +395,15 @@ select.adm-tag{border:none;cursor:pointer;-webkit-appearance:none;appearance:non
 }
 
 @media(max-width:960px){
-  .adm{grid-template-columns:1fr}
-  .adm-side{position:static;height:auto;flex-direction:row;flex-wrap:wrap;align-items:center}
+  .adm{grid-template-columns:minmax(0,1fr)}
+  .adm-side{position:sticky;top:0;z-index:40;height:auto;padding:10px 14px;flex-direction:row;flex-wrap:wrap;align-items:center;gap:3px;overflow:visible}
+  .adm-brand{width:100%;padding:2px 2px}
+  .adm-menu-btn{display:inline-flex;align-items:center;gap:7px;margin-inline-start:auto;height:38px;padding:0 13px;border-radius:11px;
+    border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.08);color:#f3ece2;font:inherit;font-size:13px;font-weight:700;cursor:pointer}
+  .adm-menu-btn .badge-n{background:var(--accent);color:#fff;border-radius:999px;font-size:11px;font-weight:800;padding:1px 7px;line-height:1.6}
+  .adm-side-nav,.adm-side-foot{display:none}
+  .adm-side.open .adm-side-nav{display:flex;flex-wrap:wrap;gap:3px;width:100%;max-height:calc(100dvh - 140px);overflow:auto;padding:6px 0 4px}
+  .adm-side.open .adm-side-foot{display:block}
   .adm-navlabel,.adm-side-foot{width:100%}
   .adm-row.c2{grid-template-columns:1fr}
   .adm-grid2,.adm-grid3{grid-template-columns:1fr}

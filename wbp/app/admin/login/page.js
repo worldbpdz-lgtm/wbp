@@ -1,6 +1,7 @@
 import { Suspense } from 'react';
 import Link from 'next/link';
-import '../admin.css';
+// Même feuille que le back-office (une seule entrée, ordre garanti).
+import '../../../styles/admin-bundle.css';
 import LoginForm from '@/components/admin/LoginForm';
 
 export const metadata = { title: 'Admin — Connexion' };

@@ -164,6 +164,17 @@ const POPUP_DEFAULTS = {
   },
 };
 
+// Mentions des documents imprimés (bon de commande, facture proforma, devis).
+// Modifiables dans /admin/settings → « Documents imprimés ».
+export const DOCUMENT_DEFAULTS = {
+  company: 'SARL World Business Plus',
+  activity: 'Import, distribution et installation d’équipements de sécurité — organisme agréé par l’État',
+  legal: '',          // RC, NIF, NIS, AI, RIB… une mention par ligne
+  terms_order: 'Livraison sous réserve de disponibilité du stock. Matériel garanti selon les conditions du constructeur.',
+  terms_quote: 'Prix valables jusqu’à la date indiquée, sous réserve de disponibilité du stock.',
+  validity_days: 15,
+};
+
 const SETTINGS_DEFAULTS = {
   whatsapp: '213560018206',
   contact: {
@@ -174,6 +185,7 @@ const SETTINGS_DEFAULTS = {
   },
   hero: { fr: { title: '', sub: '' }, en: { title: '', sub: '' }, ar: { title: '', sub: '' } },
   popup: POPUP_DEFAULTS,
+  documents: DOCUMENT_DEFAULTS,
 };
 
 export async function getSettings() {
@@ -188,6 +200,7 @@ export async function getSettings() {
       contact: { ...SETTINGS_DEFAULTS.contact, ...(map.contact || {}) },
       hero: map.hero || SETTINGS_DEFAULTS.hero,
       popup: { ...POPUP_DEFAULTS, ...(map.popup || {}) },
+      documents: { ...DOCUMENT_DEFAULTS, ...(map.documents || {}) },
     };
   } catch { return { ...SETTINGS_DEFAULTS }; }
 }

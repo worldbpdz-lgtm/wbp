@@ -1,5 +1,6 @@
 'use client';
 import React from 'react';
+import Link from 'next/link';
 import { ICON_PATHS } from '@/lib/icons';
 
 // ============================================================================
@@ -29,16 +30,19 @@ export function Icon({ name, size = 18, ...rest }) {
 }
 
 // --------------------------------------------------------------- indicateur --
-export function Kpi({ color = '#FF5A1F', icon, n, label, trend, spark }) {
-  return (
-    <div className="mb-kpi">
+// `href` : la tuile devient un lien (« 3 commandes à confirmer » → la liste).
+export function Kpi({ color = '#FF5A1F', icon, n, label, trend, spark, href }) {
+  const body = (
+    <>
       <span className="ic" style={{ background: color }}><Icon name={icon} size={17} /></span>
       {trend && <span className={`tr ${trend.dir}`}>{trend.dir === 'up' ? '↑' : trend.dir === 'down' ? '↓' : '·'}{trend.pct}%</span>}
       <div className="n">{fmt(n)}</div>
       <div className="l">{label}</div>
       {spark && <Sparkline className="spark" data={spark} color={color} />}
-    </div>
+    </>
   );
+  if (href) return <Link href={href} className="mb-kpi" style={{ textDecoration: 'none', color: 'inherit' }}>{body}</Link>;
+  return <div className="mb-kpi">{body}</div>;
 }
 
 export const fmt = (n) => (typeof n === 'number' ? n.toLocaleString('fr-FR') : n ?? '—');

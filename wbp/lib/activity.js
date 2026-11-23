@@ -52,12 +52,31 @@ export const ACTION_LABELS = {
   testAiConnection: 'Test de connexion IA',
   uploadDoc: 'Fiche technique ajoutée',
   deleteDoc: 'Document supprimé',
+  // Commandes, devis, fiches clients (app/admin/crm-actions.js)
+  createOrder: 'Commande créée',
+  updateOrder: 'Commande modifiée',
+  setOrderStatus: 'Statut de commande modifié',
+  logOrderCall: 'Appel client noté',
+  deleteOrder: 'Commande supprimée',
+  convertQuoteToOrder: 'Devis converti en commande',
+  createOrderFromMessage: 'Commande créée depuis un message',
+  createQuote: 'Devis créé',
+  updateQuote: 'Devis modifié',
+  saveNotes: 'Note interne modifiée',
+  assignItem: 'Prise en charge',
+  createCustomer: 'Fiche client créée',
+  updateCustomer: 'Fiche client modifiée',
+  deleteCustomer: 'Fiche client supprimée',
+  mergeCustomers: 'Fiches clients fusionnées',
 };
 
 // Familles d'actions → couleur / icône dans l'app mobile.
 const FAMILY = [
   [/^auth\./, 'auth', 'user', '#0E9488'],
   [/Doc$|^uploadDoc|^deleteDoc/, 'documents', 'pdf', '#E0533D'],
+  [/Order/, 'orders', 'truck', '#1F9D55'],
+  [/Customer/, 'customers', 'user', '#0E9488'],
+  [/^assignItem|^saveNotes/, 'leads', 'user', '#7c3aed'],
   [/Product|Showcase|BestSellers|Arrivals/i, 'catalog', 'box', '#FF5A1F'],
   [/Brand|Category/i, 'catalog', 'layers', '#C98A14'],
   [/Quote/i, 'quotes', 'cart', '#7c3aed'],

@@ -5,6 +5,7 @@
    Chargée en dernier pour surcharger proprement les règles ci-dessus ; retirez
    cette ligne et le site retrouve exactement son ancienne apparence. */
 @import '../styles/ui-2026.css';
+@import '../styles/order-form.css';
 
 /* quote modal items + misc additions for the full-stack build */
 .quote-items{margin:4px 0 2px;display:flex;flex-direction:column;gap:6px}

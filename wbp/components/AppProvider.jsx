@@ -155,11 +155,13 @@ export default function AppProvider({ catalog, settings = {}, ai = null, childre
   }, []);
   const removeFromCart = useCallback((id) => setCart((c) => c.filter((i) => i.id !== id)), []);
   const setQty = useCallback((id, q) => setCart((c) => q <= 0 ? c.filter((i) => i.id !== id) : c.map((i) => i.id === id ? { ...i, qty: q } : i)), []);
+  // Vidé après l'envoi d'une demande de devis ou d'une commande.
+  const clearCart = useCallback(() => setCart([]), []);
   const cartCount = cart.reduce((a, c) => a + c.qty, 0);
 
   const ctx = {
     t, lang, setLang, theme, setTheme, dir: t.dir, wbp,
-    cart, addToCart, removeFromCart, setQty, cartCount, cartOpen, setCartOpen,
+    cart, addToCart, removeFromCart, setQty, clearCart, cartCount, cartOpen, setCartOpen,
     route, nav, settings,
   };
 

@@ -30,6 +30,12 @@ export async function GET() {
     me: { email: user.email, name: displayName(user) },
     generatedAt: new Date().toISOString(),
     kpis: dashboard.kpis,
+    ordersReady: dashboard.ordersReady,
+    ordersByDay: dashboard.ordersByDay,
+    recentOrders: (dashboard.recentOrders || []).map((o) => ({
+      id: o.id, number: o.number, status: o.status, total: o.total, created_at: o.created_at,
+      who: o.company || o.customer_name || null,
+    })),
     days14: dashboard.days14,
     visitsByDay: dashboard.visitsByDay,
     leadsByDay: dashboard.leadsByDay,

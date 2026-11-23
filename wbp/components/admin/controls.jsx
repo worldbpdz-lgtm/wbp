@@ -1,4 +1,5 @@
 'use client';
+import { QUOTE_STATUSES, MESSAGE_STATUSES } from '@/lib/crm';
 import React, { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import {
@@ -87,14 +88,13 @@ export function StatusSelect({ kind, id, status }) {
   // enregistrée, au lieu de laisser affichée celle que l'admin a choisie.
   const [value, setValue] = useState(status);
   const fn = kind === 'quote' ? updateQuoteStatus : updateMessageStatus;
-  const opts = kind === 'quote'
-    ? ['new', 'contacted', 'quoted', 'closed']
-    : ['new', 'read', 'replied', 'closed'];
+  // Libellés partagés (lib/crm) : jamais le code brut (« contacted »).
+  const opts = kind === 'quote' ? QUOTE_STATUSES : MESSAGE_STATUSES;
   return (
     <>
       <select className="adm-tag" value={value} disabled={pending}
         onChange={(e) => { const next = e.target.value; setValue(next); run(() => fn(id, next), () => setValue(status)); }}>
-        {opts.map((o) => <option key={o} value={o}>{o}</option>)}
+        {opts.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
       </select>
       <Err msg={error} />
     </>

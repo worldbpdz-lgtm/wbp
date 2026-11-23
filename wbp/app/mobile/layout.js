@@ -18,7 +18,7 @@ import MobileApp from '@/components/mobile/MobileApp';
 export const metadata = {
   title: 'WBP',
   applicationName: 'WBP',
-  description: 'Statistiques du site World Business Plus, pour l’équipe.',
+  description: 'Commandes, devis, messages et statistiques du site World Business Plus, pour l’équipe.',
   manifest: '/wbp-app.webmanifest',
   robots: { index: false, follow: false, nocache: true },
   appleWebApp: {

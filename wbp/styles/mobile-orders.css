@@ -1,0 +1,130 @@
+/* ============================================================================
+   App mobile — commandes, notifications, pastilles.
+   Complète styles/mobile.css (mêmes variables --o, --ink, --line…).
+   ========================================================================== */
+
+/* Pastille de l'onglet « Demandes » et point de la cloche */
+.mb-tab-ic { position: relative; display: grid; place-items: center; }
+.mb-tab-badge {
+  position: absolute; top: -6px; inset-inline-end: -11px; min-width: 18px; height: 18px; padding: 0 5px;
+  border-radius: 999px; background: #E0331A; color: #fff; font-style: normal;
+  font-size: 10.5px; font-weight: 850; line-height: 18px; text-align: center;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, .95);
+}
+.mb-bell { position: relative; text-decoration: none; }
+.mb-bell i {
+  position: absolute; top: -5px; inset-inline-end: -5px; min-width: 17px; height: 17px; padding: 0 4px;
+  border-radius: 999px; background: #E0331A; color: #fff; font-style: normal; font-size: 10px;
+  font-weight: 850; line-height: 17px; text-align: center; box-shadow: 0 0 0 2px var(--bg);
+}
+
+/* Ligne « commande » de la liste des demandes */
+.mbi-ic.order { background: #E7F8EF; color: #128C4B; }
+.mbi-amt { font-size: 12.5px; font-weight: 800; color: var(--ink); font-variant-numeric: tabular-nums; }
+
+/* ------------------------------------------------------------- commande -- */
+.mbo-hero { display: grid; gap: 10px; padding: 15px; border-radius: var(--radius); background: var(--card); border: 1px solid var(--line); box-shadow: var(--shadow); }
+.mbo-hero .row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.mbo-hero h2 { margin: 0; font-size: 18px; font-weight: 850; letter-spacing: -.3px; }
+.mbo-hero .who { font-size: 15px; font-weight: 750; color: var(--ink); }
+.mbo-hero .sub { font-size: 12.5px; color: var(--muted); font-weight: 650; line-height: 1.45; }
+.mbo-total { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; padding-top: 10px; border-top: 1px solid var(--line); }
+.mbo-total span { font-size: 13px; font-weight: 700; color: var(--ink-2); }
+.mbo-total b { font-size: 22px; font-weight: 850; letter-spacing: -.5px; font-variant-numeric: tabular-nums; }
+
+.mbo-lines { display: grid; gap: 0; }
+.mbo-line { display: flex; align-items: center; gap: 10px; padding: 12px 0; border-top: 1px solid var(--line); background: none; border-inline: 0; border-bottom: 0; text-align: start; width: 100%; font: inherit; color: inherit; }
+.mbo-line:first-child { border-top: 0; padding-top: 2px; }
+.mbo-line .bd { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.mbo-line .bd b { font-size: 14px; font-weight: 750; line-height: 1.3; }
+.mbo-line .bd small { font-size: 12px; color: var(--muted); font-weight: 650; }
+.mbo-line .amt { text-align: end; display: grid; gap: 2px; flex-shrink: 0; }
+.mbo-line .amt b { font-size: 14px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.mbo-line .amt small { font-size: 11.5px; color: var(--muted); font-weight: 650; }
+.mbo-line .amt .miss { color: #C2410C; font-weight: 800; }
+.mbo-sum { display: grid; gap: 6px; padding-top: 10px; border-top: 1px dashed var(--line); font-size: 13.5px; }
+.mbo-sum div { display: flex; justify-content: space-between; gap: 8px; color: var(--ink-2); font-weight: 650; }
+.mbo-sum div b { color: var(--ink); font-variant-numeric: tabular-nums; }
+.mbo-sum .grand { font-size: 16px; color: var(--ink); }
+
+.mbo-chips { display: flex; flex-wrap: wrap; gap: 7px; }
+.mbo-chips button {
+  min-height: 40px; padding: 8px 13px; border-radius: 999px; border: 1px solid var(--line);
+  background: var(--card); color: var(--ink-2); font-weight: 700; font-size: 13px; line-height: 1; font-family: inherit;
+}
+.mbo-chips button.on { background: #FEF2F2; border-color: #FBD5D5; color: #B91C1C; }
+.mbo-chips button:active { transform: scale(.97); }
+
+.mbo-hist { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.mbo-hist li { display: grid; gap: 2px; padding-inline-start: 16px; position: relative; font-size: 13px; font-weight: 650; color: var(--ink-2); line-height: 1.45; }
+.mbo-hist li::before { content: ''; position: absolute; inset-inline-start: 0; top: 6px; width: 7px; height: 7px; border-radius: 50%; background: var(--line); }
+.mbo-hist li.status::before { background: var(--o); }
+.mbo-hist li.call::before { background: var(--info); }
+.mbo-hist li.created::before { background: var(--ok); }
+.mbo-hist li b { color: var(--ink); }
+.mbo-hist time { font-size: 11.5px; color: var(--muted); }
+
+.mbo-search-res { display: grid; gap: 2px; max-height: 46dvh; overflow-y: auto; }
+
+/* -------------------------------------------------------- notifications -- */
+.mbn-card { display: grid; gap: 12px; padding: 15px; border-radius: var(--radius); background: var(--card); border: 1px solid var(--line); box-shadow: var(--shadow); }
+.mbn-card h2 { margin: 0; font-size: 15px; font-weight: 800; display: flex; align-items: center; gap: 8px; }
+.mbn-card p { margin: 0; font-size: 13px; line-height: 1.5; color: var(--ink-2); font-weight: 600; }
+.mbn-state { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 800; width: fit-content; }
+.mbn-state.on { background: #ECFDF3; color: #15803D; }
+.mbn-state.off { background: #FFF7ED; color: #C2410C; }
+.mbn-steps { margin: 0; padding-inline-start: 20px; display: grid; gap: 6px; font-size: 13px; font-weight: 650; color: var(--ink-2); line-height: 1.45; }
+.mbn-list { display: grid; gap: 8px; }
+.mbn-item {
+  display: flex; gap: 11px; align-items: flex-start; padding: 12px; border-radius: 15px; border: 1px solid var(--line);
+  background: var(--card); text-decoration: none; color: inherit; box-shadow: var(--shadow);
+}
+.mbn-item.unread { border-color: #FFD3BF; background: #FFFAF6; }
+.mbn-item .ic { width: 36px; height: 36px; flex: 0 0 36px; border-radius: 11px; display: grid; place-items: center; color: #fff; }
+.mbn-item .bd { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.mbn-item .bd b { font-size: 14px; font-weight: 800; line-height: 1.3; }
+.mbn-item .bd p { margin: 0; font-size: 12.5px; color: var(--ink-2); font-weight: 600; line-height: 1.45; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.mbn-item time { font-size: 11.5px; font-weight: 800; color: var(--muted); flex-shrink: 0; }
+.mbn-item .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--o); margin-top: 5px; flex-shrink: 0; }
+
+/* Bandeau « activez les notifications » (Stats, Demandes) */
+.mbn-cta { display: flex; align-items: center; gap: 11px; padding: 12px 13px; border-radius: 15px; background: #FFF4EE; border: 1px solid #FFD3BF; color: var(--ink); text-decoration: none; }
+.mbn-cta .ic { width: 34px; height: 34px; border-radius: 10px; background: var(--o); color: #fff; display: grid; place-items: center; flex-shrink: 0; }
+.mbn-cta b { display: block; font-size: 13.5px; font-weight: 800; }
+.mbn-cta small { display: block; font-size: 12px; color: var(--ink-2); font-weight: 650; }
+.mbn-cta > .x { border: 0; background: none; color: var(--muted); padding: 4px; flex-shrink: 0; display: grid; place-items: center; }
+.mbn-cta > a + .x { margin-inline-start: auto; }
+
+/* Tons manquants de .mbl-tag (styles/mobile.css) */
+.mbl-tag.bad { background: #FEF2F2; color: #B91C1C; }
+a.mbl-row { text-decoration: none; color: inherit; }
+.mbl-row .mbi-side { display: grid; justify-items: end; gap: 4px; flex-shrink: 0; align-self: flex-start; }
+
+/* Feuille d'une demande : prise en charge, note interne */
+.mbi-who { display: flex; align-items: center; gap: 10px; padding: 11px 12px; border-radius: 13px; background: var(--bg); border: 1px solid var(--line); }
+.mbi-who .av { width: 32px; height: 32px; border-radius: 50%; background: var(--ink); color: #fff; display: grid; place-items: center; font-size: 13px; font-weight: 800; flex-shrink: 0; }
+.mbi-who .bd { flex: 1; min-width: 0; font-size: 13.5px; font-weight: 700; color: var(--ink); }
+.mbi-who .bd small { display: block; font-size: 12px; color: var(--muted); font-weight: 650; }
+.mbi-note-ro { margin: 0; padding: 11px 12px; border-radius: 13px; background: #FFFBEB; border: 1px solid #FDE9B5; color: #713F12; font-size: 13.5px; line-height: 1.5; font-weight: 600; white-space: pre-wrap; }
+.mbi-count { display: inline-grid; place-items: center; min-width: 19px; height: 19px; padding: 0 5px; margin-inline-start: 6px; border-radius: 999px; background: #E0331A; color: #fff; font-size: 11px; font-weight: 850; }
+.mbl-seg button.on .mbi-count { background: #fff; color: var(--ink); }
+
+/* Lecture seule (propriétaire) */
+.mb-ro { display: flex; gap: 8px; align-items: center; padding: 10px 12px; border-radius: 13px; background: #EEF2FF; color: #33407a; font-size: 12.5px; font-weight: 700; border: 1px solid #D6DEFB; }
+
+/* Lecture seule : libellé à gauche, valeur à droite */
+.mbo-ro { display: flex; justify-content: space-between; gap: 12px; font-size: 13.5px; padding: 2px 0; }
+.mbo-ro span { color: var(--muted); font-weight: 700; flex-shrink: 0; }
+.mbo-ro b { color: var(--ink); font-weight: 700; text-align: end; overflow-wrap: anywhere; }
+
+/* Ce qu'on sait du client (fiche) */
+.mbo-cust { display: grid; gap: 6px; padding: 12px; border-radius: 13px; background: var(--bg); border: 1px solid var(--line); }
+.mbo-cust > b { font-size: 13px; font-weight: 800; }
+.mbo-cust > span { font-size: 12.5px; color: var(--ink-2); font-weight: 650; line-height: 1.45; }
+.mbo-recent { display: grid; gap: 6px; margin-top: 2px; }
+.mbo-recent a { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 2px 8px; padding: 9px 10px; border-radius: 11px; background: var(--card); border: 1px solid var(--line); color: inherit; text-decoration: none; }
+.mbo-recent a span { font-size: 13px; font-weight: 800; }
+.mbo-recent a small { grid-column: 1; font-size: 11.5px; color: var(--muted); font-weight: 650; }
+.mbo-recent a i { grid-column: 2; grid-row: 1 / span 2; font-style: normal; }
+.mbo-line:disabled { cursor: default; }
+.mbo-line > svg { color: var(--muted); flex-shrink: 0; }

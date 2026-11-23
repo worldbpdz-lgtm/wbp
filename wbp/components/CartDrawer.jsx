@@ -6,8 +6,10 @@ import QuoteModal from '@/components/QuoteModal';
 import QtyField from '@/components/QtyField';
 
 export default function CartDrawer() {
-  const { t, cart, cartOpen, setCartOpen, removeFromCart, setQty, nav, wbp } = useApp();
-  const [quoteOpen, setQuoteOpen] = useState(false);
+  const { t, cart, cartOpen, setCartOpen, removeFromCart, setQty, nav, wbp, lang } = useApp();
+  // null = fermé ; 'quote' ou 'order' = formulaire ouvert sur ce choix.
+  const [quoteOpen, setQuoteOpen] = useState(null);
+  const ORDER = { fr: 'Commander', en: 'Place an order', ar: 'اطلب الآن' }[lang] || 'Commander';
   const count = cart.reduce((a, c) => a + c.qty, 0);
   const waText = encodeURIComponent(
     `Bonjour World Business Plus,\nJe souhaite un devis pour :\n` +
@@ -56,7 +58,8 @@ export default function CartDrawer() {
             </div>
             <div className="cart-foot">
               <div className="cart-foot-note"><Icon name="badge" size={15} /> {t('price_quote')}</div>
-              <Btn variant="primary" icon="mail" onClick={() => setQuoteOpen(true)}>{t('request_quote')}</Btn>
+              <Btn variant="primary" icon="mail" onClick={() => setQuoteOpen('quote')}>{t('request_quote')}</Btn>
+              <Btn variant="outline" icon="cart" className="cart-order" onClick={() => setQuoteOpen('order')}>{ORDER}</Btn>
               <a className="btn btn-whatsapp btn-md cart-wa" href={waLink} target="_blank" rel="noopener noreferrer">
                 <Icon name="whatsapp" size={18} /><span>{t('shop_whatsapp')}</span>
               </a>
@@ -64,7 +67,7 @@ export default function CartDrawer() {
           </>
         )}
       </aside>
-      {quoteOpen && <QuoteModal onClose={() => setQuoteOpen(false)} />}
+      {quoteOpen && <QuoteModal mode={quoteOpen} onClose={() => setQuoteOpen(null)} />}
     </>
   );
 }

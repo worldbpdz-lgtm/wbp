@@ -1,0 +1,10 @@
+/* ============================================================================
+   Feuilles du back-office, dans l'ordre où elles doivent s'appliquer.
+   Une seule entrée importée par app/admin/(panel)/layout.js : importées
+   séparément, le bundler peut les ranger dans des fichiers distincts et
+   inverser leur ordre — admin-modern.css doit toujours passer en dernier.
+   ========================================================================== */
+@import '../app/admin/admin.css';
+@import './admin-2026.css';
+@import './admin-crm.css';
+@import './admin-modern.css';
